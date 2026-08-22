@@ -1,144 +1,132 @@
-# HBTN theme — điều chỉnh để hỗ trợ thông số riêng từng phiên bản + trạng thái ngừng bán
+# HBTN theme — tích hợp hướng A (generic, KHÔNG hardcode nhãn thông số)
 
 **Gửi:** team code theme `hbtn-theme`
-**Lý do:** đối chiếu brochure chính hãng **Honda CR-V 2026**, dữ liệu đúng cho thấy các phiên bản của 1 dòng có thể **khác động cơ / số chỗ / dẫn động** (CR-V: bản **G/L = 1.5 Turbo 7 chỗ**, bản **e:HEV = 2.0 Hybrid 5 chỗ**), và có bản **đã ngừng bán** (L AWD) cần ẩn khỏi web. Theme hiện đã hỗ trợ ghi đè 5 thông số/bản (`ver_engine, ver_power, ver_torque, ver_transmission, ver_fuel`) — cần **bổ sung thêm** cho đủ.
+**Mục tiêu:** thêm/bớt **dòng xe · phiên bản · loại thông số · ngừng bán** = **chỉ đổi data**, không bao giờ sửa cấu trúc theme nữa.
 
-> **Tin tốt:** `js/car.js` **KHÔNG cần sửa**. Cơ chế override đã generic (loop mọi `[data-spec-key]`, lấy giá trị theo key trong `data-specs` của bản, không có thì dùng mặc định). Thêm key mới là tự chạy. Chỉ sửa **2 file PHP**.
+**Nguyên tắc:** theme không đọc field cố định (`ver_engine`…) nữa. Thay bằng:
+- Thông số riêng của bản = **1 repeater `specs`** (nhãn/giá-trị) trong `car_versions`.
+- Theme lấy dữ liệu qua hàm plugin **`vig_car_data()`** rồi **lặp generic**.
+- `js/car.js` **KHÔNG đổi** (đã override theo `data-spec-key`).
+
+> Cần plugin **VIG Car Sync ≥ 0.7.0** (cung cấp `vig_car_data()`).
 
 ---
 
 ## Việc 1 — `inc/carbon-fields-fields.php`
 
-### 1a. Thêm field trạng thái + 4 thông số riêng vào `car_versions`
-
-Trong `Field::make('complex', 'car_versions', …)->add_fields([ … ])`, **thêm** (giữ nguyên các field cũ `name, price, ver_engine…ver_fuel`):
+Thay **toàn bộ** phần `->add_fields([...])` của `car_versions` bằng:
 
 ```php
-// ... sau Field 'price', thêm trạng thái bán:
-Field::make('select', 'status', __('Trạng thái', 'hbtn-theme'))
-    ->set_options(['on_sale' => 'Đang bán', 'discontinued' => 'Ngừng bán'])
-    ->set_default_value('on_sale'),
-
-// ... sau 'ver_fuel', thêm 4 thông số riêng còn thiếu:
-Field::make('text', 'ver_seats',       __('Số chỗ ngồi', 'hbtn-theme')),
-Field::make('text', 'ver_drivetrain',  __('Dẫn động', 'hbtn-theme')),
-Field::make('text', 'ver_consumption', __('Mức tiêu thụ (hỗn hợp)', 'hbtn-theme')),
-Field::make('text', 'ver_weight',      __('Trọng lượng (bản thân)', 'hbtn-theme')),
+Field::make('complex', 'car_versions', __('Phiên bản & giá', 'hbtn-theme'))
+    ->set_layout('tabbed-horizontal')
+    ->add_fields([
+        Field::make('text',   'name',   __('Tên phiên bản', 'hbtn-theme')),
+        Field::make('text',   'price',  __('Giá niêm yết (VNĐ)', 'hbtn-theme')),
+        Field::make('select', 'status', __('Trạng thái', 'hbtn-theme'))
+            ->set_options(['on_sale' => 'Đang bán', 'discontinued' => 'Ngừng bán'])
+            ->set_default_value('on_sale'),
+        // Thông số RIÊNG của bản — repeater generic (thêm nhãn nào cũng được, KHÔNG cần field mới)
+        Field::make('complex', 'specs', __('Thông số riêng bản này', 'hbtn-theme'))
+            ->set_layout('tabbed-horizontal')
+            ->add_fields([
+                Field::make('text', 'spec_label', __('Tên thông số', 'hbtn-theme')),
+                Field::make('text', 'spec_value', __('Giá trị', 'hbtn-theme')),
+            ]),
+    ]),
 ```
 
-> Không đổi tên các field cũ. Plugin **VIG Car Sync** tra cứu theo đúng các tên này.
+- **Bỏ** các field `ver_engine, ver_power, ver_torque, ver_transmission, ver_fuel` + `separator` cũ.
+- `car_specs` (chung): nâng giới hạn — `->set_max(24)` hoặc bỏ `set_max` (dòng có thể ~22).
 
 ---
 
 ## Việc 2 — `single-cars.php`
 
-### 2a. Mở rộng `$spec_key_map` (thêm 4 dòng)
+### 2a. Đầu file: lấy data qua plugin (thay 3 dòng đọc cũ)
 
+Thay:
 ```php
-$spec_key_map = [
-    'Động cơ'                  => 'engine',
-    'Công suất'                => 'power',
-    'Mô-men xoắn'              => 'torque',
-    'Hộp số'                   => 'transmission',
-    'Nhiên liệu'               => 'fuel',
-    // MỚI:
-    'Số chỗ ngồi'              => 'seats',
-    'Dẫn động'                 => 'drivetrain',
-    'Mức tiêu thụ (hỗn hợp)'   => 'consumption',
-    'Trọng lượng (bản thân)'   => 'weight',
-];
+$price    = (int) preg_replace('/\D/', '', (string) carbon_get_the_post_meta('car_price'));
+$specs    = carbon_get_the_post_meta('car_specs') ?: [];
+$versions = carbon_get_the_post_meta('car_versions') ?: [];
 ```
+bằng:
+```php
+$car      = function_exists('vig_car_data') ? vig_car_data(get_the_ID())
+                                            : ['price'=>0,'versions'=>[],'common'=>[]];
+$price    = (int) $car['price'];
+$common   = $car['common'];   // [ ['label','value','key'], … ]  ← thông số CHUNG
+// chỉ hiển thị bản đang bán:
+$versions = array_values(array_filter($car['versions'], function ($v) {
+                return ($v['status'] ?? 'on_sale') !== 'discontinued';
+            }));
+```
+> (các biến khác: `$img,$colors,$promos,$gallery,$seo_*` giữ nguyên đọc `carbon_get_the_post_meta`.)
 
-### 2b. Mở rộng `$ver_specs_json` (thêm 4 key)
+### 2b. Bỏ `$spec_key_map` + đổi `$ver_specs_json` thành generic
 
+Xoá mảng `$spec_key_map`. Thay `$ver_specs_json` bằng:
 ```php
 $ver_specs_json = function ($v) {
-    return wp_json_encode([
-        'engine'       => $v['ver_engine'] ?? '',
-        'power'        => $v['ver_power'] ?? '',
-        'torque'       => $v['ver_torque'] ?? '',
-        'transmission' => $v['ver_transmission'] ?? '',
-        'fuel'         => $v['ver_fuel'] ?? '',
-        // MỚI:
-        'seats'        => $v['ver_seats'] ?? '',
-        'drivetrain'   => $v['ver_drivetrain'] ?? '',
-        'consumption'  => $v['ver_consumption'] ?? '',
-        'weight'       => $v['ver_weight'] ?? '',
-    ]);
+    $m = [];
+    foreach ($v['specs'] as $s) $m[$s['key']] = $s['value'];   // key = sanitize_title(nhãn), do plugin cấp
+    return wp_json_encode($m);
 };
 ```
+`$first` (bản mặc định) và `$vprefix` (rút gọn nhãn tab) **giữ nguyên** — vẫn chạy trên `$versions` đã lọc.
 
-### 2c. Ẩn phiên bản `discontinued` khỏi web
+### 2c. Bảng thông số chung: gắn `data-spec-key` từ key của plugin
 
-Có **2 vòng lặp** render tab phiên bản (spec-sidebar `.vtab` ~dòng 62, và lăn bánh `.vtab-or` ~dòng 117). Ngay đầu mỗi vòng, bỏ qua bản ngừng bán:
-
+Thay vòng lặp render `$specs` (dùng `$spec_key_map`) bằng:
 ```php
-foreach ($versions as $i => $v) :
-    if (($v['status'] ?? 'on_sale') === 'discontinued') continue;   // ẩn bản ngừng bán
-    $vp = (int) preg_replace('/\D/', '', (string) $v['price']);
-    // ... giữ nguyên phần còn lại
+<?php foreach ($common as $s) : ?>
+  <div class="spec-row">
+    <span class="spec-row-label"><?php echo esc_html($s['label']); ?></span>
+    <span class="spec-row-value" data-spec-key="<?php echo esc_attr($s['key']); ?>"><?php echo esc_html($s['value']); ?></span>
+  </div>
+<?php endforeach; ?>
 ```
 
-> Tuỳ chọn: nếu muốn **vẫn hiện** bản ngừng bán nhưng có nhãn, thay `continue` bằng việc thêm class/badge `Ngừng bán` — nhưng khuyến nghị ẩn để không gây nhầm bảng giá.
->
-> Lưu ý `$first = $versions[0]` (dòng ~18): nếu bản đầu tiên là discontinued thì nên chọn bản `on_sale` đầu tiên làm mặc định. Gợi ý:
-> ```php
-> $active = array_values(array_filter($versions, fn($v) => ($v['status'] ?? 'on_sale') !== 'discontinued'));
-> $first  = $active ? $active[0] : ($versions[0] ?? ['name' => get_the_title(), 'price' => $price]);
-> ```
+### 2d. Các vòng lặp tab phiên bản (2 chỗ: `.vtab` và `.vtab-or`)
+
+Giữ nguyên cấu trúc — chỉ đảm bảo lặp trên `$versions` (đã lọc) và dùng `$v['price']`, `$v['name']`, `$ver_specs_json($v)`. Không còn `$v['ver_*']`. Ví dụ:
+```php
+<?php foreach ($versions as $i => $v) :
+    $vp  = (int) preg_replace('/\D/', '', (string) $v['price']);
+    $lbl = trim(substr($v['name'], strlen($vprefix))); if ($lbl === '') $lbl = $v['name']; ?>
+  <button type="button" class="vtab<?php echo $i === 0 ? ' active' : ''; ?>"
+          data-price="<?php echo esc_attr($vp); ?>"
+          data-name="<?php echo esc_attr($v['name']); ?>"
+          data-specs="<?php echo esc_attr($ver_specs_json($v)); ?>"><?php echo esc_html($lbl); ?></button>
+<?php endforeach; ?>
+```
 
 ---
 
-## Điều kiện để override hiển thị (quan trọng)
+## `js/car.js` — KHÔNG đổi ✅
 
-JS chỉ ghi đè được dòng thông số **đã tồn tại** trong bảng "Thông số kỹ thuật" chung (`car_specs`) — vì nó tìm phần tử `[data-spec-key]`. Nên bảng chung của mỗi xe **phải có sẵn dòng** cho các nhãn: `Số chỗ ngồi`, `Dẫn động`, `Mức tiêu thụ (hỗn hợp)`, `Trọng lượng (bản thân)` (giá trị mặc định = bản base). **Plugin VIG Car Sync tự ghi** các dòng này khi đồng bộ, nên team theme không phải nhập tay.
-
-Plugin ghi `car_specs` = **9 thông số của bản base** (động cơ, công suất, mô-men, hộp số, nhiên liệu, số chỗ, dẫn động, tiêu thụ, trọng lượng — các dòng sẽ được override) **+ ~13 thông số chung của dòng** (kích thước, gầm, lốp, treo, phanh…). Với CR-V là **~22 dòng** → cần **nâng `set_max`** (hiện `12`):
-
-```php
-// trong car_specs:
-->set_max(24)   // cũ: 12 — nâng để đủ 9 spec bản base + ~13 spec chung (hoặc bỏ hẳn set_max)
-```
-
-> Bảng chung sẽ dài hơn trước (~22 dòng thay vì ~12). Nếu muốn gọn, team theme có thể style/gộp hiển thị — nhưng **giữ đủ 9 dòng có `data-spec-key`** để cơ chế override theo bản còn chạy.
+Cơ chế override đã generic: nó lấy mọi `[data-spec-key]`, và với mỗi bản đọc `data-specs` (map key→giá trị) để thay. Vì `data-spec-key` (ở bảng chung) và key trong `data-specs` (ở bản) đều = `sanitize_title(nhãn)` do **plugin** cấp → luôn khớp. Máy tính **giá lăn bánh** cũng không đổi (vẫn đọc `data-price` của bản đang chọn).
 
 ---
 
-## Hợp đồng dữ liệu plugin → theme (để 2 bên khớp)
+## Sau khi sửa: chạy lại đồng bộ để nạp đúng cấu trúc
 
-Sau khi theme xong, plugin **VIG Car Sync 0.4.x** (Repository bản HBTN) sẽ ghi:
+Data cũ (nếu nhập tay theo `ver_*`) vẫn ĐỌC được (plugin có fallback), nhưng nên **sync lại** để bảng chung có đủ dòng cho override:
+```bash
+wp vig-car pull --all --changed --yes
+```
 
-- `car_price` (text số) — giá bản đang bán thấp nhất
-- `car_specs[]` — thông số **CHUNG** cả dòng: `{ spec_label, spec_value }` (gồm cả các dòng có `data-spec-key` để override)
-- `car_versions[]` — mỗi phiên bản:
-  ```
-  name, price, status(on_sale|discontinued),
-  ver_engine, ver_power, ver_torque, ver_transmission, ver_fuel,
-  ver_seats, ver_drivetrain, ver_consumption, ver_weight
-  ```
+## Từ nay về sau
 
-Nguồn dữ liệu chuẩn = **VIG Car Hub** (`vighub:honda/honda-cr-v`, JSON tại `raw.githubusercontent.com/vigdigital/vig-car-data`). Plugin map `versions[].specs[]` (label→value) sang đúng các ô `ver_*` theo bảng:
-
-| Nhãn trong hub (`label`) | Ô theme (`car_versions`) |
+| Thao tác | Sửa theme? |
 |---|---|
-| Động cơ | `ver_engine` |
-| Công suất | `ver_power` |
-| Mô-men xoắn | `ver_torque` |
-| Hộp số | `ver_transmission` |
-| Nhiên liệu | `ver_fuel` |
-| Số chỗ ngồi | `ver_seats` |
-| Dẫn động | `ver_drivetrain` |
-| Mức tiêu thụ (hỗn hợp) | `ver_consumption` |
-| Trọng lượng (bản thân) | `ver_weight` |
+| Thêm/bớt dòng xe, phiên bản | ❌ chỉ data |
+| Thêm **loại thông số mới** (vd "Dung lượng pin") | ❌ chỉ data (repeater) |
+| Ngừng bán | ❌ chỉ data (`status`) |
 
----
+## Checklist test (1 xe CR-V)
 
-## Checklist test (trang 1 xe CR-V)
-
-- [ ] Sửa xe CR-V → tab **Thông số**: `car_versions` có ô Trạng thái + Số chỗ/Dẫn động/Tiêu thụ/Trọng lượng
-- [ ] Bấm lần lượt các tab bản ngoài web (`.vtab`): **Động cơ, Số chỗ, Hộp số, Tiêu thụ… đổi theo bản** (G = 1.5T/7 chỗ; e:HEV = 2.0 Hybrid/5 chỗ)
-- [ ] Bản **L AWD (ngừng bán) không xuất hiện** trong danh sách bản + máy tính lăn bánh
-- [ ] Bản mặc định khi mở trang là bản đang bán (không phải bản ngừng bán)
-- [ ] `car_specs` hiển thị đủ thông số chung (không bị cắt do `set_max`)
-
-Tham chiếu dữ liệu đúng: brochure `CRV 2026.pdf` (file hãng) và `docs/DATA-CONTRACT.md` trong plugin.
+- [ ] Tab **Thông số** trong admin: `car_versions` có ô Trạng thái + repeater "Thông số riêng bản này"
+- [ ] Ngoài web: bấm các tab bản → Động cơ/Số chỗ/Hộp số/Tiêu thụ **đổi theo bản** (G=1.5T/7 chỗ; e:HEV=2.0 Hybrid/5 chỗ)
+- [ ] Bản **ngừng bán không hiện**; bản mặc định là bản đang bán
+- [ ] Máy tính **giá lăn bánh** vẫn đúng theo bản đang chọn

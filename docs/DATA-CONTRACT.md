@@ -4,11 +4,11 @@ Tài liệu cho **theme developer** tích hợp website với plugin **VIG Car S
 Plugin đồng bộ dữ liệu xe vào các **Carbon Fields** trên CPT `cars`. Theme phải
 **định nghĩa đúng các field dưới đây** thì plugin mới ghi được.
 
-> ⚠️ **Đây là contract GENERIC (thông số riêng của bản = complex `specs` lồng).**
-> Bản Repository đang ship **nhắm site HBTN**, dùng biến thể **field phẳng `ver_*`** (không phải specs lồng)
-> để khớp theme `hbtn-theme` có sẵn. Nếu bạn tích hợp cho **HBTN**, xem **[docs/hbtn-theme-integration.md](hbtn-theme-integration.md)**
-> (mapping nhãn → `ver_engine/ver_power/ver_seats/…` + `status`). Contract generic dưới đây dành cho **theme mới** —
-> khi đó cần một Repository map sang `specs` lồng (chưa ship sẵn).
+> ✅ **Contract này là cách ship chính thức (hướng A — generic).** Thông số riêng của bản = complex `specs` lồng
+> (`spec_label`/`spec_value`), thêm nhãn nào cũng được, **không cần field mới**. Plugin (≥0.7.0) cấp hàm
+> **`vig_car_data($id)`** để theme lấy dữ liệu đã chuẩn hoá (kèm `key` = `sanitize_title(nhãn)`) và **lặp generic** —
+> theme không hardcode nhãn. Tích hợp cho theme `hbtn-theme`: xem **[docs/hbtn-theme-integration.md](hbtn-theme-integration.md)**.
+> (Bản đời trước dùng field phẳng `ver_*` — nay đã bỏ; Repository vẫn ĐỌC fallback `ver_*` cho data cũ.)
 
 ---
 

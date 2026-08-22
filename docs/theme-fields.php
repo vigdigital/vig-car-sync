@@ -1,10 +1,10 @@
 <?php
 /**
- * VIG Car Sync — Carbon Fields cho CPT `cars` — MẪU GENERIC (specs lồng).
+ * VIG Car Sync — Carbon Fields cho CPT `cars` — MẪU GENERIC (specs lồng, hướng A).
  *
- * ⚠️ KHÔNG dùng cho site HBTN. Theme hbtn dùng field PHẲNG ver_* (ver_engine, ver_seats…),
- *    và Repository đang ship map sang ver_* — xem docs/hbtn-theme-integration.md.
- *    File này chỉ để tham chiếu cho THEME MỚI muốn dùng specs lồng.
+ * Đây là cách ship chính thức: thông số riêng của bản = repeater `specs` (spec_label/spec_value).
+ * Theme lấy dữ liệu qua vig_car_data($id) rồi lặp generic — xem docs/hbtn-theme-integration.md
+ * để biết cách sửa single-cars.php khớp mẫu này.
  *
  * Cách dùng: copy toàn bộ khối add_action bên dưới vào file khai báo Carbon Fields
  * của theme (thường là functions.php của child theme, chỗ đang có

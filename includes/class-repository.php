@@ -2,18 +2,19 @@
 defined('ABSPATH') || exit;
 
 /**
- * Target = site HBTN (Carbon Fields trên CPT cars).
- * Đọc dữ liệu hiện tại + ghi dữ liệu mới. (Sau này có thể thay bằng target khác.)
+ * Target = site dealer (Carbon Fields trên CPT cars). Đọc dữ liệu hiện tại + ghi dữ liệu mới.
  *
- * LƯU Ý cấu trúc HBTN (khác contract generic):
- *   - car_versions[]: name, price, status, + thông số riêng dạng field PHẲNG ver_* (không phải specs lồng).
- *   - car_specs[]:    thông số CHUNG (spec_label/spec_value). Theme override ver_* lên các dòng có
- *                     data-spec-key khi bấm tab bản → nên các nhãn override PHẢI có mặt trong car_specs.
- *   Xem docs/hbtn-theme-integration.md.
+ * CẤU TRÚC (hướng A — generic, không phụ thuộc nhãn thông số):
+ *   - car_versions[]: name, price, status, specs[] (complex lồng: spec_label/spec_value).
+ *   - car_specs[]:    thông số CHUNG (spec_label/spec_value).
+ *   → Thêm/bớt loại thông số = chỉ data; theme lặp generic (không hardcode nhãn).
+ *
+ * Đọc còn fallback field phẳng ver_* (dữ liệu cũ) — xem VER_MAP.
+ * Theme lấy dữ liệu để render qua vig_car_data($id) → self::for_display().
  */
 class VCS_Repository {
 
-    /** Nhãn spec (nguồn/hub) → sub-field ver_* trong car_versions của theme HBTN. */
+    /** (Fallback đọc dữ liệu CŨ) nhãn spec → sub-field ver_* phẳng của theme đời trước. */
     const VER_MAP = [
         'Động cơ'                => 'ver_engine',
         'Công suất'              => 'ver_power',
@@ -32,13 +33,23 @@ class VCS_Repository {
         return trim(preg_replace('/^\s*honda\s+/i', '', $t));
     }
 
-    /** Đọc ver_* của 1 phiên bản → mảng specs [[label,value]] (đảo VER_MAP). */
+    /** Fallback: đọc ver_* của 1 phiên bản (dữ liệu cũ) → [[label,value]]. */
     private static function read_ver_specs($v) {
         $out = [];
         foreach (self::VER_MAP as $label => $field) {
             if (isset($v[$field]) && $v[$field] !== '') $out[] = ['label' => $label, 'value' => (string) $v[$field]];
         }
         return $out;
+    }
+
+    /** Đọc specs lồng của 1 phiên bản; nếu trống → fallback ver_* cũ. */
+    private static function read_version_specs($v) {
+        $out = [];
+        foreach ((array) ($v['specs'] ?? []) as $s) {
+            $l = (string) ($s['spec_label'] ?? '');
+            if ($l !== '') $out[] = ['label' => $l, 'value' => (string) ($s['spec_value'] ?? '')];
+        }
+        return $out ?: self::read_ver_specs($v);
     }
 
     /** Dữ liệu hiện tại: ['price'=>int, 'versions'=>[[name,price,status,specs]], 'specs'=>[[label,value]]]. */
@@ -49,7 +60,7 @@ class VCS_Repository {
                 'name'   => (string) ($v['name'] ?? ''),
                 'price'  => (int) preg_replace('/\D/', '', (string) ($v['price'] ?? '')),
                 'status' => (($v['status'] ?? 'on_sale') === 'discontinued') ? 'discontinued' : 'on_sale',
-                'specs'  => self::read_ver_specs($v),
+                'specs'  => self::read_version_specs($v),
             ];
         }
         $specs = [];
@@ -64,8 +75,29 @@ class VCS_Repository {
     }
 
     /**
-     * Dựng giá trị "mới" (đã áp mapping) từ dữ liệu nguồn, để so sánh & ghi.
-     * - versions: name = shortname + ' ' + label; giữ status + specs riêng (map ver_* khi apply).
+     * Dữ liệu để THEME render (generic). Mỗi spec kèm 'key' = sanitize_title(nhãn) để theme
+     * gắn data-spec-key (JS đổi thông số theo bản khớp key này — không cần map cứng).
+     *   ['price'=>int, 'versions'=>[['name','price','status','specs'=>[['label','value','key']]]], 'common'=>[[label,value,key]]]
+     */
+    public static function for_display($post_id) {
+        $c = self::current($post_id);
+        $withkey = function ($s) {
+            return ['label' => $s['label'], 'value' => $s['value'], 'key' => sanitize_title($s['label'])];
+        };
+        $versions = array_map(function ($v) use ($withkey) {
+            $v['specs'] = array_map($withkey, $v['specs']);
+            return $v;
+        }, $c['versions']);
+        return [
+            'price'    => $c['price'],
+            'versions' => $versions,
+            'common'   => array_map($withkey, $c['specs']),
+        ];
+    }
+
+    /**
+     * Dựng giá trị "mới" từ nguồn, để so sánh & ghi.
+     * - versions: name = shortname + ' ' + label; giữ status + specs riêng.
      * - car_specs (CHUNG) = specs riêng của BẢN BASE (bản on_sale đầu tiên) + specs chung của dòng.
      *   → bản base cung cấp các dòng có data-spec-key để theme override khi bấm tab bản khác.
      */
@@ -96,9 +128,9 @@ class VCS_Repository {
             if ($label === '' || isset($seen[$label])) return;
             $specs[] = ['label' => $label, 'value' => $value]; $seen[$label] = true;
         };
-        if ($base) foreach ($base['specs'] as $s) $push($s['label'], $s['value']);   // động cơ, công suất, số chỗ… (bản base)
-        foreach ((array) $normalized['specs'] as $s) $push($s['label'], $s['value']); // kích thước, gầm, lốp… (chung)
-        foreach ($cur['specs'] as $s) if (!isset($seen[$s['label']])) $push($s['label'], $s['value']); // giữ spec cũ nguồn không có
+        if ($base) foreach ($base['specs'] as $s) $push($s['label'], $s['value']);
+        foreach ((array) $normalized['specs'] as $s) $push($s['label'], $s['value']);
+        foreach ($cur['specs'] as $s) if (!isset($seen[$s['label']])) $push($s['label'], $s['value']);
 
         return [
             'price'    => (int) $normalized['price'],
@@ -107,17 +139,19 @@ class VCS_Repository {
         ];
     }
 
-    /** Ghi vào Carbon Fields (định dạng HBTN: car_versions phẳng ver_*). Trả về true/false. */
+    /** Ghi vào Carbon Fields (generic: car_versions.specs lồng). Trả về true/false. */
     public static function apply($post_id, $built) {
         if (!function_exists('carbon_set_post_meta')) return false;
         self::set($post_id, 'car_price', (string) $built['price']);
         self::set($post_id, 'car_versions', array_map(function ($v) {
-            $row = ['name' => $v['name'], 'price' => (string) $v['price'], 'status' => $v['status'] ?? 'on_sale'];
-            foreach (self::VER_MAP as $field) $row[$field] = ''; // khởi tạo đủ ô
-            foreach ((array) ($v['specs'] ?? []) as $s) {
-                if (isset(self::VER_MAP[$s['label']])) $row[self::VER_MAP[$s['label']]] = (string) $s['value'];
-            }
-            return $row;
+            return [
+                'name'   => $v['name'],
+                'price'  => (string) $v['price'],
+                'status' => $v['status'] ?? 'on_sale',
+                'specs'  => array_map(function ($s) {
+                    return ['spec_label' => $s['label'], 'spec_value' => $s['value']];
+                }, isset($v['specs']) && is_array($v['specs']) ? $v['specs'] : []),
+            ];
         }, $built['versions']));
         self::set($post_id, 'car_specs', array_map(function ($s) {
             return ['spec_label' => $s['label'], 'spec_value' => $s['value']];

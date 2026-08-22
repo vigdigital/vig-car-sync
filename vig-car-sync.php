@@ -3,7 +3,7 @@
  * Plugin Name: VIG Car Sync
  * Plugin URI:  https://vigdigital.com
  * Description: Trích xuất dữ liệu xe (giá · phiên bản · thông số) từ nguồn ngoài → so sánh & đồng bộ vào website (Carbon Fields). Nền tảng cho kho dữ liệu xe tập trung của VIG.
- * Version:     0.6.1
+ * Version:     0.7.0
  * Author:      VIG Digital
  * Author URI:  https://vigdigital.com
  * License:     GPL-2.0-or-later
@@ -19,7 +19,7 @@
 
 defined('ABSPATH') || exit;
 
-define('VCS_VER', '0.6.1');
+define('VCS_VER', '0.7.0');
 define('VCS_DIR', plugin_dir_path(__FILE__));
 define('VCS_URL', plugin_dir_url(__FILE__));
 define('VCS_POST_TYPE', 'cars');          // CPT được đồng bộ
@@ -42,6 +42,24 @@ require_once VCS_DIR . 'includes/class-admin.php';
 add_action('plugins_loaded', function () {
     VCS_Admin::init();
 });
+
+/**
+ * API cho THEME (hướng A — theme lặp generic, không hardcode nhãn thông số).
+ * Trả về dữ liệu xe đã chuẩn hoá để render:
+ *   [
+ *     'price'    => int,
+ *     'versions' => [ ['name','price','status'(on_sale|discontinued),
+ *                      'specs'=>[ ['label','value','key'], … ]], … ],   // 'key' = sanitize_title(label) cho data-spec-key
+ *     'common'   => [ ['label','value','key'], … ],                     // thông số chung của dòng
+ *   ]
+ * Thêm/bớt loại thông số/bản = chỉ đổi data, theme KHÔNG cần đổi cấu trúc.
+ */
+if (!function_exists('vig_car_data')) {
+    function vig_car_data($post_id = null) {
+        $post_id = $post_id ?: get_the_ID();
+        return VCS_Repository::for_display((int) $post_id);
+    }
+}
 
 // WP-CLI: build kho dữ liệu xe tập trung (VIG nội bộ) — dealer không dùng.
 if (defined('WP_CLI') && WP_CLI) {
