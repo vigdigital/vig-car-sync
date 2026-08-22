@@ -6,6 +6,21 @@ Plugin đồng bộ dữ liệu xe vào các **Carbon Fields** trên CPT `cars`.
 
 ---
 
+## 0. Phân cấp dữ liệu (3 tầng)
+
+```
+Hãng (Brand)      →  Honda                         → file data/honda.json (brand)
+  └ Dòng (Model)  →  City · CR-V · HR-V …          → models[]  (mỗi phần tử 1 dòng)
+      └ Phiên bản →  CR-V G · CR-V L · CR-V e:HEV RS → models[].versions[]  (mỗi dòng nhiều bản)
+```
+
+- **Hãng** = 1 file JSON/hãng (`brand`, `brand_name`).
+- **Dòng** = 1 phần tử `models[]` (`slug`, `name`, `price` = giá bản thấp nhất, `specs[]`).
+- **Phiên bản** = 1 phần tử `versions[]` trong dòng (`name` = nhãn rút gọn "G"/"L"/"e:HEV RS", `price`).
+  → **Tên phiên bản đầy đủ = Dòng + nhãn** ("CR-V" + "G" = "CR-V G"). Kho lưu nhãn rút gọn;
+  plugin dealer tự ghép tên dòng khi ghi (`Repository::shortname` + label). Trên site, field
+  `car_versions[].name` = tên đầy đủ (vd "CR-V G").
+
 ## 1. Bối cảnh
 
 - **CPT bắt buộc:** `cars` (theme tự đăng ký `register_post_type('cars', …)`).
