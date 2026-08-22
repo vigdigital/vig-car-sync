@@ -54,6 +54,13 @@ class VCS_CLI {
                 $slug_override = is_array($item) ? trim((string) ($item['slug'] ?? '')) : '';
                 if ($url === '') { \WP_CLI::warning('  bỏ qua entry thiếu url'); $fail++; continue; }
 
+                // Model đã CURATE tay + khoá ("locked": true) → giữ nguyên, không scrape đè.
+                if (!empty($existing[$url]['locked'])) {
+                    \WP_CLI::log('  🔒 giữ nguyên (locked): ' . ($existing[$url]['name'] ?? $url));
+                    $ok++;
+                    continue;
+                }
+
                 $source = VCS_Sources::detect($url);
                 if (!$source) { \WP_CLI::warning("  bỏ qua (không nhận nguồn): $url"); $fail++; continue; }
                 $data = $source->fetch($url);
@@ -67,7 +74,12 @@ class VCS_CLI {
                     'source'     => $data['source'],
                     'source_url' => $url,
                     'price'      => (int) $data['price'],
-                    'versions'   => array_map(function ($v) { return ['name' => $v['label'] ?? ($v['name'] ?? ''), 'price' => (int) $v['price']]; }, (array) $data['versions']),
+                    'versions'   => array_map(function ($v) {
+                        $out = ['name' => $v['label'] ?? ($v['name'] ?? ''), 'price' => (int) $v['price']];
+                        if (!empty($v['status'])) $out['status'] = $v['status'];      // on_sale|discontinued (nếu nguồn có)
+                        if (!empty($v['specs']))  $out['specs']  = array_values((array) $v['specs']); // thông số riêng của bản
+                        return $out;
+                    }, (array) $data['versions']),
                     'specs'      => array_values((array) $data['specs']),
                     'updated_at' => gmdate('c'),
                 ];

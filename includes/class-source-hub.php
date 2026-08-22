@@ -58,9 +58,20 @@ class VCS_Source_Hub implements VCS_Source_Interface {
         if (!$model) return $this->err("Không tìm thấy model '$slug' trong kho '$brand'.");
 
         // Map JSON hub → định dạng chuẩn của interface (versions: name→label).
+        // Mang theo status (on_sale|discontinued) + specs RIÊNG của từng phiên bản.
         $versions = [];
         foreach ((array) ($model['versions'] ?? []) as $v) {
-            $versions[] = ['label' => (string) ($v['name'] ?? ''), 'price' => (int) ($v['price'] ?? 0)];
+            $vspecs = [];
+            foreach ((array) ($v['specs'] ?? []) as $s) {
+                $vspecs[] = ['label' => (string) ($s['label'] ?? ''), 'value' => (string) ($s['value'] ?? '')];
+            }
+            $status = ($v['status'] ?? 'on_sale');
+            $versions[] = [
+                'label'  => (string) ($v['name'] ?? ''),
+                'price'  => (int) ($v['price'] ?? 0),
+                'status' => in_array($status, ['on_sale', 'discontinued'], true) ? $status : 'on_sale',
+                'specs'  => $vspecs,
+            ];
         }
         $specs = [];
         foreach ((array) ($model['specs'] ?? []) as $s) {

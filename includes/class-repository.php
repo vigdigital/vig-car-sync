@@ -17,7 +17,16 @@ class VCS_Repository {
     public static function current($post_id) {
         $versions = [];
         foreach ((array) self::cf($post_id, 'car_versions') as $v) {
-            $versions[] = ['name' => (string) ($v['name'] ?? ''), 'price' => (int) preg_replace('/\D/', '', (string) ($v['price'] ?? ''))];
+            $vspecs = [];
+            foreach ((array) ($v['specs'] ?? []) as $s) {
+                $vspecs[] = ['label' => (string) ($s['spec_label'] ?? ''), 'value' => (string) ($s['spec_value'] ?? '')];
+            }
+            $versions[] = [
+                'name'   => (string) ($v['name'] ?? ''),
+                'price'  => (int) preg_replace('/\D/', '', (string) ($v['price'] ?? '')),
+                'status' => (($v['status'] ?? 'on_sale') === 'discontinued') ? 'discontinued' : 'on_sale',
+                'specs'  => $vspecs,
+            ];
         }
         $specs = [];
         foreach ((array) self::cf($post_id, 'car_specs') as $s) {
@@ -42,7 +51,12 @@ class VCS_Repository {
         $versions = [];
         foreach ($normalized['versions'] as $v) {
             $name = trim($short . ' ' . $v['label']);
-            $versions[] = ['name' => $name, 'price' => (int) $v['price']];
+            $versions[] = [
+                'name'   => $name,
+                'price'  => (int) $v['price'],
+                'status' => (($v['status'] ?? 'on_sale') === 'discontinued') ? 'discontinued' : 'on_sale',
+                'specs'  => isset($v['specs']) && is_array($v['specs']) ? $v['specs'] : [],
+            ];
         }
 
         // Merge specs theo label, giữ thứ tự cũ trước, thêm mới ở cuối.
@@ -74,7 +88,14 @@ class VCS_Repository {
         if (!function_exists('carbon_set_post_meta')) return false;
         self::set($post_id, 'car_price', (string) $built['price']);
         self::set($post_id, 'car_versions', array_map(function ($v) {
-            return ['name' => $v['name'], 'price' => (string) $v['price']];
+            return [
+                'name'   => $v['name'],
+                'price'  => (string) $v['price'],
+                'status' => $v['status'] ?? 'on_sale',
+                'specs'  => array_map(function ($s) {
+                    return ['spec_label' => $s['label'], 'spec_value' => $s['value']];
+                }, isset($v['specs']) && is_array($v['specs']) ? $v['specs'] : []),
+            ];
         }, $built['versions']));
         self::set($post_id, 'car_specs', array_map(function ($s) {
             return ['spec_label' => $s['label'], 'spec_value' => $s['value']];

@@ -37,10 +37,11 @@ class VCS_Differ {
             $new_names[$v['name']] = true;
             $c = isset($cur_by[$v['name']]) ? $cur_by[$v['name']] : null;
             $n = (int) $v['price'];
+            $disc = (($v['status'] ?? 'on_sale') === 'discontinued');
             $rows[] = [
-                'field'   => $v['name'],
+                'field'   => $v['name'] . ($disc ? ' — ⛔ ngừng bán' : ''),
                 'current' => ($c === null) ? '—' : self::money($c),
-                'new'     => self::money($n),
+                'new'     => self::money($n) . ($disc ? ' (ẩn khỏi bảng giá)' : ''),
                 'status'  => ($c === null) ? 'new' : (($c === $n) ? 'same' : 'changed'),
             ];
         }
