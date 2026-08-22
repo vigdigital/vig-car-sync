@@ -129,9 +129,10 @@ class VCS_Admin {
         $built = self::fetch_and_build($id);
         if (is_wp_error($built)) wp_send_json_error(['msg' => $built->get_error_message()]);
 
-        $diff = VCS_Differ::diff(VCS_Repository::current($id), $built);
+        $cur  = VCS_Repository::current($id);
+        $diff = VCS_Differ::diff($cur, $built);
         wp_send_json_success([
-            'html'    => self::render_diff($diff, $built['_model']),
+            'html'    => self::render_matrix($cur, $built),
             'changes' => VCS_Differ::count_changes($diff),
         ]);
     }
@@ -164,31 +165,78 @@ class VCS_Admin {
         return $built;
     }
 
-    /* ---------- Render bảng so sánh ---------- */
-    public static function render_diff($diff, $model) {
-        $groups = [
-            'price'    => 'Giá',
-            'versions' => 'Phiên bản',
-            'specs'    => 'Thông số kỹ thuật',
-        ];
+    /* ---------- Render MA TRẬN so sánh: hàng = thông số, cột = phiên bản ---------- */
+
+    private static function money($n) { $n = (int) $n; return $n ? number_format($n, 0, ',', '.') . ' đ' : '—'; }
+
+    /** Gộp thông số 1 phiên bản = chung + riêng (riêng ghi đè). */
+    private static function version_map($common, $version_specs) {
+        $m = $common;
+        foreach ((array) $version_specs as $s) $m[$s['label']] = $s['value'];
+        return $m;
+    }
+
+    public static function render_matrix($cur, $built) {
+        $versions = (array) $built['versions'];
+
+        // Bản đồ thông số MỚI theo từng phiên bản + thứ tự hàng.
+        $common_new = [];
+        foreach ((array) $built['specs'] as $s) $common_new[$s['label']] = $s['value'];
+        $labels = array_keys($common_new); // hàng = mọi nhãn thông số (theo thứ tự build)
+        $new_by = [];
+        foreach ($versions as $v) $new_by[$v['name']] = self::version_map($common_new, $v['specs'] ?? []);
+
+        // Bản đồ HIỆN TẠI theo phiên bản (để tô ô sẽ đổi).
+        $common_cur = [];
+        foreach ((array) $cur['specs'] as $s) $common_cur[$s['label']] = $s['value'];
+        $cur_by = [];
+        foreach ((array) $cur['versions'] as $v) {
+            $cur_by[$v['name']] = ['price' => (int) $v['price'], 'map' => self::version_map($common_cur, $v['specs'] ?? [])];
+        }
+
+        $cell = function ($new, $old) {
+            $chg = ($old === null) || ((string) $old !== (string) $new); // khác/mới → tô xanh
+            return '<td class="' . ($chg ? 'vcs-hl' : '') . '">' . esc_html($new === '' ? '—' : $new) . '</td>';
+        };
+
         ob_start();
         echo '<div class="vcs-diff">';
-        if ($model) echo '<div class="vcs-model">Nguồn: <strong>' . esc_html($model) . '</strong></div>';
-        echo '<table class="vcs-table"><thead><tr><th>Trường</th><th>Hiện tại</th><th>Dữ liệu mới</th></tr></thead><tbody>';
-        foreach ($groups as $key => $title) {
-            echo '<tr class="vcs-group"><td colspan="3">' . esc_html($title) . '</td></tr>';
-            foreach ($diff[$key] as $r) {
-                $cls = 'vcs-' . $r['status'];
-                echo '<tr class="' . $cls . '">';
-                echo '<td class="vcs-field">' . esc_html($r['field']) . '</td>';
-                echo '<td class="vcs-cur">' . esc_html($r['current']) . '</td>';
-                echo '<td class="vcs-newval">' . esc_html($r['new']);
-                if ($r['status'] === 'new') echo ' <span class="vcs-tag">mới</span>';
-                elseif ($r['status'] === 'changed') echo ' <span class="vcs-tag">đổi</span>';
-                echo '</td></tr>';
-            }
+        if (!empty($built['_model'])) {
+            echo '<div class="vcs-model">Nguồn: <strong>' . esc_html($built['_model']) . '</strong> — ô <span class="vcs-hl-txt">tô xanh</span> là giá trị sẽ thay đổi khi Chấp nhận.</div>';
         }
-        echo '</tbody></table>';
+        echo '<div class="vcs-matrix-wrap"><table class="vcs-matrix"><thead><tr><th class="vcs-rowhead">Thông tin / Thông số</th>';
+        foreach ($versions as $v) {
+            $disc = (($v['status'] ?? 'on_sale') === 'discontinued');
+            echo '<th' . ($disc ? ' class="vcs-col-disc"' : '') . '>' . esc_html($v['name']) . ($disc ? '<br><small>⛔ ngừng bán</small>' : '') . '</th>';
+        }
+        echo '</tr></thead><tbody>';
+
+        // Hàng Giá
+        echo '<tr><td class="vcs-rowhead">Giá</td>';
+        foreach ($versions as $v) {
+            $old = isset($cur_by[$v['name']]) ? $cur_by[$v['name']]['price'] : null;
+            echo $cell(self::money($v['price']), $old === null ? null : self::money($old));
+        }
+        echo '</tr>';
+
+        // Hàng thông số
+        foreach ($labels as $label) {
+            echo '<tr><td class="vcs-rowhead">' . esc_html($label) . '</td>';
+            foreach ($versions as $v) {
+                $new = $new_by[$v['name']][$label] ?? '';
+                $old = isset($cur_by[$v['name']]['map'][$label]) ? $cur_by[$v['name']]['map'][$label] : null;
+                echo $cell($new, $old);
+            }
+            echo '</tr>';
+        }
+        echo '</tbody></table></div>';
+
+        // Phiên bản cũ không còn ở nguồn (nếu có)
+        $new_names = array_column($versions, 'name');
+        $removed = [];
+        foreach ((array) $cur['versions'] as $v) if (!in_array($v['name'], $new_names, true)) $removed[] = $v['name'];
+        if ($removed) echo '<p class="vcs-removed">⚠️ Phiên bản không còn ở nguồn (sẽ bị xoá khi ghi): <strong>' . esc_html(implode(', ', $removed)) . '</strong></p>';
+
         echo '<div class="vcs-actions"><button class="button button-primary vcs-accept">Chấp nhận đồng bộ</button> <button class="button vcs-cancel">Huỷ</button></div>';
         echo '</div>';
         return ob_get_clean();

@@ -37,3 +37,20 @@
 .vcs-badge-need{background:#fbeaea;color:#b32d2e}
 .vcs-badge-ok{background:#e6f4ea;color:#1e7e34}
 .vcs-badge-warn{background:#fff4e5;color:#8a5a00}
+
+/* Ma trận so sánh: hàng = thông số, cột = phiên bản */
+.vcs-model{margin:6px 0 10px;color:#50575e}
+.vcs-hl-txt{background:#e6f4ea;color:#0a5c2b;padding:1px 6px;border-radius:3px;font-weight:600}
+.vcs-matrix-wrap{overflow-x:auto;max-height:70vh;border:1px solid #dcdcde;border-radius:4px}
+.vcs-matrix{border-collapse:collapse;min-width:100%;font-size:13px;background:#fff}
+.vcs-matrix th,.vcs-matrix td{border:1px solid #e0e0e2;padding:7px 12px;text-align:left;vertical-align:top;white-space:normal}
+.vcs-matrix thead th{background:#f0f0f1;position:sticky;top:0;z-index:2;font-weight:600}
+.vcs-matrix .vcs-rowhead{background:#f6f7f7;font-weight:600;position:sticky;left:0;z-index:1;min-width:150px;max-width:220px}
+.vcs-matrix thead .vcs-rowhead{z-index:3}
+.vcs-matrix td.vcs-hl{background:#e6f4ea;color:#0a5c2b;font-weight:600}
+.vcs-matrix th.vcs-col-disc{color:#b32d2e;background:#fbeaea}
+.vcs-matrix th.vcs-col-disc small{font-weight:400}
+.vcs-matrix tbody tr:hover td{background:#fafcff}
+.vcs-matrix tbody tr:hover td.vcs-hl{background:#dbeee2}
+.vcs-removed{color:#8a2424;margin:8px 0}
+.vcs-actions{margin-top:12px}
