@@ -281,10 +281,11 @@ class VCS_CLI {
             $models = [];
             foreach ((array) ($b['models'] ?? []) as $m) {
                 $models[] = [
-                    'slug'  => $m['slug'] ?? '',
-                    'name'  => $m['name'] ?? '',
-                    'price' => (int) ($m['price'] ?? 0),
-                    'rev'   => VCS_Source_Hub::rev($m),   // mã băm nội dung → consumer biết model đã đổi chưa
+                    'slug'   => $m['slug'] ?? '',
+                    'name'   => $m['name'] ?? '',
+                    'price'  => (int) ($m['price'] ?? 0),
+                    'status' => (($m['status'] ?? 'on_sale') === 'discontinued') ? 'discontinued' : 'on_sale',
+                    'rev'    => VCS_Source_Hub::rev($m),   // mã băm nội dung → consumer biết model đã đổi chưa
                 ];
             }
             $brands[] = [
