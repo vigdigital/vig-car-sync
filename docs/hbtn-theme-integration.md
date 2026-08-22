@@ -90,18 +90,37 @@ Mỗi thông số có cờ **`basic`** (do plugin gán, đổi qua filter `vcs_b
 <?php endforeach; ?>
 ```
 
-**Thông số ĐẦY ĐỦ** — đặt ở đâu tuỳ website (section riêng, tab "Thông số kỹ thuật", accordion…). Ví dụ 1 bảng đầy đủ:
+**Thông số ĐẦY ĐỦ** — đặt ở đâu tuỳ website (section riêng, tab, accordion…).
+
+### 👉 Kiểu HIỂN THỊ RÚT GỌN (khuyến nghị): bảng ngắn + nút "Xem đầy đủ"
+
+Bảng ngắn ở trên (chỉ `basic`) luôn hiện; phần đầy đủ gói trong `<details>` — **gập sẵn, bấm mới mở, KHÔNG cần JS**:
 ```php
-<table class="car-specs-full">
-  <?php foreach ($common as $s) : ?>
-    <tr>
-      <td><?php echo esc_html($s['label']); ?></td>
-      <td data-spec-key="<?php echo esc_attr($s['key']); ?>"><?php echo esc_html($s['value']); ?></td>
-    </tr>
-  <?php endforeach; ?>
-</table>
+<details class="specs-full">
+  <summary>Xem thông số đầy đủ</summary>
+  <table class="car-specs-full">
+    <?php foreach ($common as $s) : ?>
+      <tr>
+        <td><?php echo esc_html($s['label']); ?></td>
+        <td data-spec-key="<?php echo esc_attr($s['key']); ?>"><?php echo esc_html($s['value']); ?></td>
+      </tr>
+    <?php endforeach; ?>
+  </table>
+</details>
 ```
-> Gắn `data-spec-key` ở cả bảng đầy đủ thì nó **cũng đổi theo bản** khi bấm tab (car.js override mọi phần tử có key). Không muốn đổi theo bản thì bỏ `data-spec-key` ở bảng đầy đủ — nó sẽ hiện cố định (giá trị bản base).
+CSS gợi ý:
+```css
+.specs-full > summary{cursor:pointer;color:#c00;font-weight:600;padding:8px 0;list-style:none}
+.specs-full > summary::after{content:" ▾"}
+.specs-full[open] > summary::after{content:" ▴"}
+.specs-full table{width:100%;border-collapse:collapse}
+.specs-full td{padding:8px 4px;border-bottom:1px solid #eee}
+.specs-full td:first-child{color:#666;width:45%}
+```
+
+> Bảng đầy đủ cũng gắn `data-spec-key` → **cũng đổi theo bản** khi bấm tab. Không muốn đổi theo bản thì bỏ `data-spec-key` ở bảng đầy đủ (hiện cố định giá trị bản base).
+>
+> **Rút gọn = bảng ngắn (`basic`) + `<details>` cho phần còn lại.** Muốn bảng ngắn ít/nhiều dòng hơn: đổi filter `vcs_basic_specs` (xem dưới), KHÔNG cần sửa markup.
 
 **Đổi nhóm cơ bản** (mặc định: Động cơ · Hộp số · Công suất · Số chỗ ngồi · Nhiên liệu · Mức tiêu thụ) — thêm vào `functions.php`:
 ```php
