@@ -46,10 +46,26 @@ class VCS_Source_Hub implements VCS_Source_Interface {
         return is_array($data) ? $data : null;
     }
 
-    /** index.json → danh sách hãng + model (cho dropdown chọn). */
+    /** index.json → danh sách TẤT CẢ hãng + model (cho trang cài đặt). */
     public static function index() {
         $idx = self::get_json('index.json');
         return is_array($idx) && !empty($idx['brands']) ? $idx['brands'] : [];
+    }
+
+    /** Hãng site được phép sync (option 'vcs_brands'); rỗng = tất cả (tương thích). */
+    public static function allowed_brands() {
+        $b = get_option('vcs_brands', []);
+        return is_array($b) ? array_values(array_filter(array_map('sanitize_key', $b))) : [];
+    }
+
+    /** index.json ĐÃ LỌC theo hãng site chọn — dùng cho dropdown chọn nguồn. */
+    public static function index_for_site() {
+        $all = self::index();
+        $allowed = self::allowed_brands();
+        if (!$allowed) return $all;
+        return array_values(array_filter($all, function ($b) use ($allowed) {
+            return in_array($b['brand'] ?? '', $allowed, true);
+        }));
     }
 
     /**

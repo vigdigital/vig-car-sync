@@ -22,8 +22,8 @@ class VCS_Admin {
         wp_nonce_field('vcs_save_url', 'vcs_url_nonce');
         $url = get_post_meta($post->ID, VCS_URL_META, true);
 
-        // Dropdown chọn từ kho VIG Car Hub (nhanh, không cần dán link).
-        $brands = VCS_Source_Hub::index();
+        // Dropdown chọn từ kho VIG Car Hub (chỉ hãng site đã chọn ở Cài đặt).
+        $brands = VCS_Source_Hub::index_for_site();
         if ($brands) {
             echo '<p><label for="vcs_hub_pick"><strong>Chọn từ kho VIG Car Hub</strong></label></p>';
             echo '<select id="vcs_hub_pick" style="width:100%"><option value="">— chọn model —</option>';
@@ -72,6 +72,42 @@ class VCS_Admin {
             'edit.php?post_type=' . VCS_POST_TYPE,
             'Đồng bộ dữ liệu xe', 'Đồng bộ dữ liệu', 'edit_posts', 'vcs-sync', [__CLASS__, 'page']
         );
+        add_submenu_page(
+            'edit.php?post_type=' . VCS_POST_TYPE,
+            'Cài đặt đồng bộ', 'Cài đặt đồng bộ', 'manage_options', 'vcs-settings', [__CLASS__, 'settings_page']
+        );
+    }
+
+    /* ---------- Trang cài đặt: chọn hãng site này sync ---------- */
+    public static function settings_page() {
+        if (!current_user_can('manage_options')) wp_die('Không có quyền.');
+        if (isset($_POST['vcs_brands_nonce']) && wp_verify_nonce($_POST['vcs_brands_nonce'], 'vcs_save_brands')) {
+            $picked = (isset($_POST['vcs_brands']) && is_array($_POST['vcs_brands'])) ? array_map('sanitize_key', $_POST['vcs_brands']) : [];
+            update_option('vcs_brands', $picked);
+            echo '<div class="notice notice-success is-dismissible"><p>Đã lưu lựa chọn hãng.</p></div>';
+        }
+        VCS_Source_Hub::flush(); // lấy danh sách hãng mới nhất (vd BYD vừa thêm)
+        $all = VCS_Source_Hub::index();
+        $allowed = VCS_Source_Hub::allowed_brands();
+
+        echo '<div class="wrap vcs-wrap"><h1>Cài đặt đồng bộ — Chọn hãng xe</h1>';
+        echo '<p class="description">Chọn (các) hãng mà website này quản lý. Chỉ hãng được chọn mới hiện trong ô "Chọn từ kho VIG Car Hub" khi thêm nguồn cho xe. Bỏ trống = hiện tất cả hãng.</p>';
+        if (!$all) {
+            echo '<p><em>Chưa tải được danh sách hãng từ Hub.</em></p></div>';
+            return;
+        }
+        echo '<form method="post"><table class="form-table"><tbody><tr><th scope="row">Hãng đồng bộ</th><td>';
+        foreach ($all as $b) {
+            $slug = $b['brand'] ?? '';
+            $name = $b['brand_name'] ?? $slug;
+            $cnt  = count((array) ($b['models'] ?? []));
+            $chk  = in_array($slug, $allowed, true) ? ' checked' : '';
+            echo '<label style="display:block;margin:6px 0"><input type="checkbox" name="vcs_brands[]" value="' . esc_attr($slug) . '"' . $chk . '> <strong>' . esc_html($name) . '</strong> <span class="description">(' . (int) $cnt . ' dòng)</span></label>';
+        }
+        echo '</td></tr></tbody></table>';
+        wp_nonce_field('vcs_save_brands', 'vcs_brands_nonce');
+        submit_button('Lưu lựa chọn');
+        echo '</form></div>';
     }
 
     public static function page() {
