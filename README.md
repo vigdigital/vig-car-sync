@@ -13,10 +13,10 @@ Theme phải định nghĩa 3 Carbon Fields trên CPT `cars` (plugin tra theo t�
 | Field | Kiểu | Sub-field |
 |---|---|---|
 | `car_price` | text (số) | — |
-| `car_versions` | complex (repeater) | `name`, `price` |
+| `car_versions` | complex (repeater) | `name`, `price`, `status` (đang bán/ngừng bán), `specs` (complex lồng: `spec_label`, `spec_value`) |
 | `car_specs` | complex (repeater) | `spec_label`, `spec_value` |
 
-`car_specs` là **repeater** (mỗi thông số 1 dòng), không phải mỗi thông số 1 field.
+`car_specs` = thông số **CHUNG** cả dòng; `car_versions.specs` = thông số **RIÊNG** từng bản (vì có dòng khác động cơ/số chỗ giữa các bản, vd CR-V G/L = 1.5T 7 chỗ, e:HEV = 2.0 Hybrid 5 chỗ). `status`/`specs` là tuỳ chọn — theme chưa thêm vẫn chạy.
 Code đăng ký field + bộ nhãn thông số chuẩn + cách đọc ra front-end: xem [DATA-CONTRACT.md](docs/DATA-CONTRACT.md).
 
 - **Merge thông minh:** thông số nguồn không có (kích thước, trục cơ sở…) được **giữ nguyên**, không bị xoá.
