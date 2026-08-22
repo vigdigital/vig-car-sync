@@ -78,16 +78,36 @@ $ver_specs_json = function ($v) {
 ```
 `$first` (bản mặc định) và `$vprefix` (rút gọn nhãn tab) **giữ nguyên** — vẫn chạy trên `$versions` đã lọc.
 
-### 2c. Bảng thông số chung: gắn `data-spec-key` từ key của plugin
+### 2c. Bảng thông số: CƠ BẢN (sidebar) vs ĐẦY ĐỦ (website tự đặt chỗ)
 
-Thay vòng lặp render `$specs` (dùng `$spec_key_map`) bằng:
+Mỗi thông số có cờ **`basic`** (do plugin gán, đổi qua filter `vcs_basic_specs`). Bảng ở **sidebar chỉ hiện thông số cơ bản** cho gọn:
 ```php
-<?php foreach ($common as $s) : ?>
+<?php foreach ($common as $s) : if (empty($s['basic'])) continue;   // chỉ thông số CƠ BẢN ?>
   <div class="spec-row">
     <span class="spec-row-label"><?php echo esc_html($s['label']); ?></span>
     <span class="spec-row-value" data-spec-key="<?php echo esc_attr($s['key']); ?>"><?php echo esc_html($s['value']); ?></span>
   </div>
 <?php endforeach; ?>
+```
+
+**Thông số ĐẦY ĐỦ** — đặt ở đâu tuỳ website (section riêng, tab "Thông số kỹ thuật", accordion…). Ví dụ 1 bảng đầy đủ:
+```php
+<table class="car-specs-full">
+  <?php foreach ($common as $s) : ?>
+    <tr>
+      <td><?php echo esc_html($s['label']); ?></td>
+      <td data-spec-key="<?php echo esc_attr($s['key']); ?>"><?php echo esc_html($s['value']); ?></td>
+    </tr>
+  <?php endforeach; ?>
+</table>
+```
+> Gắn `data-spec-key` ở cả bảng đầy đủ thì nó **cũng đổi theo bản** khi bấm tab (car.js override mọi phần tử có key). Không muốn đổi theo bản thì bỏ `data-spec-key` ở bảng đầy đủ — nó sẽ hiện cố định (giá trị bản base).
+
+**Đổi nhóm cơ bản** (mặc định: Động cơ · Hộp số · Công suất · Số chỗ ngồi · Nhiên liệu · Mức tiêu thụ) — thêm vào `functions.php`:
+```php
+add_filter('vcs_basic_specs', function ($labels) {
+    return ['Động cơ', 'Công suất', 'Số chỗ ngồi', 'Dẫn động']; // ví dụ tự chọn
+});
 ```
 
 ### 2d. Các vòng lặp tab phiên bản (2 chỗ: `.vtab` và `.vtab-or`)

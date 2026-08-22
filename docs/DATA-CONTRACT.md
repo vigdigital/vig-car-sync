@@ -6,8 +6,10 @@ Plugin đồng bộ dữ liệu xe vào các **Carbon Fields** trên CPT `cars`.
 
 > ✅ **Contract này là cách ship chính thức (hướng A — generic).** Thông số riêng của bản = complex `specs` lồng
 > (`spec_label`/`spec_value`), thêm nhãn nào cũng được, **không cần field mới**. Plugin (≥0.7.0) cấp hàm
-> **`vig_car_data($id)`** để theme lấy dữ liệu đã chuẩn hoá (kèm `key` = `sanitize_title(nhãn)`) và **lặp generic** —
-> theme không hardcode nhãn. Tích hợp cho theme `hbtn-theme`: xem **[docs/hbtn-theme-integration.md](hbtn-theme-integration.md)**.
+> **`vig_car_data($id)`** để theme lấy dữ liệu đã chuẩn hoá (mỗi spec kèm `key` = `sanitize_title(nhãn)` và cờ
+> `basic` = thông số cơ bản) và **lặp generic** — theme không hardcode nhãn. Bảng ngắn hiện `basic`, bảng đầy đủ hiện
+> tất cả (website tự đặt chỗ); đổi nhóm cơ bản qua filter `vcs_basic_specs`. Tích hợp `hbtn-theme`: xem
+> **[docs/hbtn-theme-integration.md](hbtn-theme-integration.md)**.
 > (Bản đời trước dùng field phẳng `ver_*` — nay đã bỏ; Repository vẫn ĐỌC fallback `ver_*` cho data cũ.)
 
 ---

@@ -14,6 +14,20 @@ defined('ABSPATH') || exit;
  */
 class VCS_Repository {
 
+    /**
+     * Nhãn thông số "CƠ BẢN" (hiện ở bảng ngắn/sidebar). Phần còn lại = "đầy đủ",
+     * website tự chọn hiển thị ở đâu. Đổi qua filter 'vcs_basic_specs'.
+     */
+    const BASIC_SPECS = [
+        'Động cơ', 'Hộp số', 'Công suất', 'Số chỗ ngồi', 'Nhiên liệu', 'Mức tiêu thụ (hỗn hợp)',
+    ];
+
+    /** Danh sách nhãn cơ bản (cho phép theme/plugin đổi qua filter). */
+    public static function basic_labels() {
+        $labels = apply_filters('vcs_basic_specs', self::BASIC_SPECS);
+        return is_array($labels) ? $labels : self::BASIC_SPECS;
+    }
+
     /** (Fallback đọc dữ liệu CŨ) nhãn spec → sub-field ver_* phẳng của theme đời trước. */
     const VER_MAP = [
         'Động cơ'                => 'ver_engine',
@@ -125,8 +139,14 @@ class VCS_Repository {
      */
     public static function for_display($post_id) {
         $c = self::current($post_id);
-        $withkey = function ($s) {
-            return ['label' => $s['label'], 'value' => $s['value'], 'key' => sanitize_title($s['label'])];
+        $basic = self::basic_labels();
+        $withkey = function ($s) use ($basic) {
+            return [
+                'label' => $s['label'],
+                'value' => $s['value'],
+                'key'   => sanitize_title($s['label']),
+                'basic' => in_array($s['label'], $basic, true),   // true = thông số cơ bản (bảng ngắn)
+            ];
         };
         $versions = array_map(function ($v) use ($withkey) {
             $v['specs'] = array_map($withkey, $v['specs']);
