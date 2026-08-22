@@ -74,10 +74,12 @@ class VCS_Admin {
     }
 
     public static function page() {
+        if (isset($_GET['vcs_flush'])) VCS_Source_Hub::flush(); // nút "Làm mới" → bỏ cache Hub
         $cars = get_posts(['post_type' => VCS_POST_TYPE, 'numberposts' => -1, 'orderby' => 'menu_order', 'order' => 'ASC']);
         $hubrev = VCS_Source_Hub::rev_index();   // brand/slug → rev hiện tại ở hub (1 lần)
+        $flush_url = wp_nonce_url(add_query_arg(['page' => 'vcs-sync', 'vcs_flush' => 1], admin_url('edit.php?post_type=' . VCS_POST_TYPE)), 'vcs_flush');
         echo '<div class="wrap vcs-wrap"><h1>Đồng bộ dữ liệu xe từ nguồn</h1>';
-        echo '<p class="description">Trích xuất giá · phiên bản · thông số từ nguồn → đối chiếu với dữ liệu hiện tại. <span class="vcs-legend"><i class="vcs-dot vcs-new"></i> giá trị mới/khác sẽ tô xanh</span>. Bấm <strong>Chấp nhận</strong> để ghi đè.</p>';
+        echo '<p class="description">Trích xuất giá · phiên bản · thông số từ nguồn → đối chiếu với dữ liệu hiện tại. <span class="vcs-legend"><i class="vcs-dot vcs-new"></i> giá trị mới/khác sẽ tô xanh</span>. Bấm <strong>Chấp nhận</strong> để ghi đè. · <a href="' . esc_url($flush_url) . '">🔄 Làm mới dữ liệu Hub</a> (nếu vừa cập nhật kho mà chưa thấy đổi).</p>';
         echo '<table class="widefat striped vcs-list"><thead><tr><th style="width:240px">Dòng xe</th><th>URL nguồn</th><th style="width:230px">Thao tác</th></tr></thead><tbody>';
         foreach ($cars as $c) {
             $url = get_post_meta($c->ID, VCS_URL_META, true);
@@ -123,6 +125,7 @@ class VCS_Admin {
         $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
         if (!$id || !current_user_can('edit_post', $id)) wp_send_json_error(['msg' => 'Không có quyền.']);
 
+        VCS_Source_Hub::flush(); // luôn lấy data Hub MỚI khi bấm Đồng bộ (bỏ cache 1h)
         $built = self::fetch_and_build($id);
         if (is_wp_error($built)) wp_send_json_error(['msg' => $built->get_error_message()]);
 

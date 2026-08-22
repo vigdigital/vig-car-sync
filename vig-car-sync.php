@@ -3,7 +3,7 @@
  * Plugin Name: VIG Car Sync
  * Plugin URI:  https://vigdigital.com
  * Description: Trích xuất dữ liệu xe (giá · phiên bản · thông số) từ nguồn ngoài → so sánh & đồng bộ vào website (Carbon Fields). Nền tảng cho kho dữ liệu xe tập trung của VIG.
- * Version:     0.8.0
+ * Version:     0.9.0
  * Author:      VIG Digital
  * Author URI:  https://vigdigital.com
  * License:     GPL-2.0-or-later
@@ -19,7 +19,7 @@
 
 defined('ABSPATH') || exit;
 
-define('VCS_VER', '0.8.0');
+define('VCS_VER', '0.9.0');
 define('VCS_DIR', plugin_dir_path(__FILE__));
 define('VCS_URL', plugin_dir_url(__FILE__));
 define('VCS_POST_TYPE', 'cars');          // CPT được đồng bộ

@@ -22,6 +22,18 @@ class VCS_Source_Hub implements VCS_Source_Interface {
         return trailingslashit($b);
     }
 
+    /** Xoá toàn bộ cache Hub (transient vcs_hub_*) — gọi trước khi đồng bộ để chắc chắn lấy data MỚI. */
+    public static function flush() {
+        global $wpdb;
+        if (isset($wpdb) && is_object($wpdb)) {
+            $wpdb->query(
+                "DELETE FROM {$wpdb->options}
+                 WHERE option_name LIKE '\\_transient\\_vcs\\_hub\\_%'
+                    OR option_name LIKE '\\_transient\\_timeout\\_vcs\\_hub\\_%'"
+            );
+        }
+    }
+
     /** GET + decode 1 file JSON của hub (cache 1h). */
     public static function get_json($file) {
         $key = 'vcs_hub_' . md5($file);

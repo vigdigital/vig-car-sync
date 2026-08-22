@@ -28,21 +28,38 @@ class VCS_Differ {
         ]];
     }
 
+    /** Chữ ký thông số 1 bản (để phát hiện thông số RIÊNG đổi dù giá/tên giữ nguyên). */
+    private static function spec_sig($specs) {
+        $a = [];
+        foreach ((array) $specs as $s) $a[] = ($s['label'] ?? '') . '=' . ($s['value'] ?? '');
+        sort($a);
+        return implode('|', $a);
+    }
+
     private static function diff_versions($cur, $new) {
         $rows = [];
         $cur_by = [];
-        foreach ($cur['versions'] as $v) $cur_by[$v['name']] = (int) $v['price'];
+        foreach ($cur['versions'] as $v) $cur_by[$v['name']] = $v; // giữ CẢ bản (giá + status + specs)
         $new_names = [];
         foreach ($new['versions'] as $v) {
             $new_names[$v['name']] = true;
-            $c = isset($cur_by[$v['name']]) ? $cur_by[$v['name']] : null;
-            $n = (int) $v['price'];
+            $c   = $cur_by[$v['name']] ?? null;
+            $cp  = $c ? (int) $c['price'] : null;
+            $np  = (int) $v['price'];
             $disc = (($v['status'] ?? 'on_sale') === 'discontinued');
+            // đổi = giá khác, HOẶC trạng thái khác, HOẶC thông số riêng khác
+            $st_changed  = $c && (($c['status'] ?? 'on_sale') !== ($v['status'] ?? 'on_sale'));
+            $sp_changed  = $c && (self::spec_sig($c['specs'] ?? []) !== self::spec_sig($v['specs'] ?? []));
+            if ($c === null)                             $status = 'new';
+            elseif ($cp !== $np || $st_changed || $sp_changed) $status = 'changed';
+            else                                         $status = 'same';
+            $note = '';
+            if ($status === 'changed' && $cp === $np && !$st_changed && $sp_changed) $note = ' (thông số bản đổi)';
             $rows[] = [
                 'field'   => $v['name'] . ($disc ? ' — ⛔ ngừng bán' : ''),
-                'current' => ($c === null) ? '—' : self::money($c),
-                'new'     => self::money($n) . ($disc ? ' (ẩn khỏi bảng giá)' : ''),
-                'status'  => ($c === null) ? 'new' : (($c === $n) ? 'same' : 'changed'),
+                'current' => ($c === null) ? '—' : self::money($cp),
+                'new'     => self::money($np) . $note . ($disc ? ' (ẩn khỏi bảng giá)' : ''),
+                'status'  => $status,
             ];
         }
         // Phiên bản cũ không còn trong nguồn

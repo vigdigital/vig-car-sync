@@ -48,6 +48,8 @@ class VCS_CLI {
         $yes     = isset($assoc['yes']);
         $changed = isset($assoc['changed']);
 
+        VCS_Source_Hub::flush(); // đồng bộ = luôn lấy data Hub mới nhất (bỏ cache)
+
         // Ép nguồn + lưu vào xe (khi có --post).
         if ($source !== '' && $post_id) update_post_meta($post_id, VCS_URL_META, $source);
 
@@ -127,6 +129,7 @@ class VCS_CLI {
      */
     public function status($args, $assoc) {
         $only_changed = isset($assoc['changed']);
+        VCS_Source_Hub::flush(); // lấy index rev mới nhất
         $hubrev = VCS_Source_Hub::rev_index();
 
         $ids = get_posts([
