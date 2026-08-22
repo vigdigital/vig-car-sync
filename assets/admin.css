@@ -31,3 +31,9 @@
 .vcs-actions .vcs-accept { background: #16a34a; border-color: #15803d; }
 .vcs-actions .vcs-accept:hover { background: #15803d; }
 .vcs-empty { color: #666; font-style: italic; padding: 10px 0; }
+
+/* Nhãn trạng thái đồng bộ (so rev hub) */
+.vcs-badge{display:inline-block;font-size:11px;font-weight:600;line-height:1.6;padding:0 8px;border-radius:10px;margin-left:6px;vertical-align:middle}
+.vcs-badge-need{background:#fbeaea;color:#b32d2e}
+.vcs-badge-ok{background:#e6f4ea;color:#1e7e34}
+.vcs-badge-warn{background:#fff4e5;color:#8a5a00}

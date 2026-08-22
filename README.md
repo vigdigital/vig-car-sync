@@ -10,13 +10,17 @@ Trích xuất dữ liệu xe từ nguồn ngoài (VnExpress) → đối chiếu 
 
 **Cách 2 — WP-CLI** (consumer, tự động hoá):
 ```bash
-# đồng bộ 1 xe, ép nguồn + lưu vào xe, ghi luôn:
-wp vig-car pull --post=123 --source=vighub:honda/honda-cr-v --yes
-# xem trước thay đổi mọi xe, không ghi:
-wp vig-car pull --all --dry-run
-# đồng bộ mọi xe (có hỏi xác nhận từng xe):
-wp vig-car pull --all
+# XEM xe nào cần đồng bộ (chỉ tải index.json, so mã rev):
+wp vig-car status               # tất cả xe: Mới nhất / Cần cập nhật / Chưa sync
+wp vig-car status --changed     # chỉ xe cần cập nhật
+
+# ĐỒNG BỘ:
+wp vig-car pull --post=123 --source=vighub:honda/honda-cr-v --yes  # 1 xe, ép nguồn, ghi luôn
+wp vig-car pull --all --changed --yes                             # CHỈ xe đổi ở hub (khuyên dùng)
+wp vig-car pull --all --dry-run                                   # xem trước mọi xe, không ghi
 ```
+> **Cơ chế biết xe nào cần sync:** mỗi model ở hub có mã **`rev`** (băm nội dung giá+phiên bản+thông số) trong `index.json`. Khi ghi, site lưu rev đã sync vào meta `_vcs_hub_rev`. `status`/`--changed` so rev site ↔ hub → chỉ đụng xe thật sự đổi. Trang **Xe → Đồng bộ** cũng hiện nhãn *Cần cập nhật / Mới nhất*.
+>
 > `wp vig-car build …` là lệnh **PRODUCER** (tạo file JSON kho, chạy ở máy build của VIG) — khác `pull`.
 
 ## Trường được đồng bộ → xem **[Hợp đồng dữ liệu (docs/DATA-CONTRACT.md)](docs/DATA-CONTRACT.md)**

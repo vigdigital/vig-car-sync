@@ -75,12 +75,24 @@ class VCS_Admin {
 
     public static function page() {
         $cars = get_posts(['post_type' => VCS_POST_TYPE, 'numberposts' => -1, 'orderby' => 'menu_order', 'order' => 'ASC']);
+        $hubrev = VCS_Source_Hub::rev_index();   // brand/slug → rev hiện tại ở hub (1 lần)
         echo '<div class="wrap vcs-wrap"><h1>Đồng bộ dữ liệu xe từ nguồn</h1>';
-        echo '<p class="description">Trích xuất giá · phiên bản · thông số từ nguồn (VnExpress) → đối chiếu với dữ liệu hiện tại. <span class="vcs-legend"><i class="vcs-dot vcs-new"></i> giá trị mới/khác sẽ tô xanh</span>. Bấm <strong>Chấp nhận</strong> để ghi đè.</p>';
-        echo '<table class="widefat striped vcs-list"><thead><tr><th style="width:220px">Dòng xe</th><th>URL nguồn</th><th style="width:230px">Thao tác</th></tr></thead><tbody>';
+        echo '<p class="description">Trích xuất giá · phiên bản · thông số từ nguồn → đối chiếu với dữ liệu hiện tại. <span class="vcs-legend"><i class="vcs-dot vcs-new"></i> giá trị mới/khác sẽ tô xanh</span>. Bấm <strong>Chấp nhận</strong> để ghi đè.</p>';
+        echo '<table class="widefat striped vcs-list"><thead><tr><th style="width:240px">Dòng xe</th><th>URL nguồn</th><th style="width:230px">Thao tác</th></tr></thead><tbody>';
         foreach ($cars as $c) {
             $url = get_post_meta($c->ID, VCS_URL_META, true);
-            echo '<tr data-id="' . (int) $c->ID . '"><td><strong>' . esc_html($c->post_title) . '</strong></td>';
+            // Nhãn "cần cập nhật" cho nguồn hub (so rev đã sync ↔ rev hub).
+            $badge = '';
+            if ($url && strpos($url, 'vighub:') === 0) {
+                $key = substr($url, strlen('vighub:'));
+                $site = (string) get_post_meta($c->ID, '_vcs_hub_rev', true);
+                $hub  = $hubrev[$key] ?? '';
+                if ($hub === '')        $badge = ' <span class="vcs-badge vcs-badge-warn" title="Không tìm thấy ở hub">? hub</span>';
+                elseif ($site === '')   $badge = ' <span class="vcs-badge vcs-badge-need">Chưa sync</span>';
+                elseif ($site !== $hub) $badge = ' <span class="vcs-badge vcs-badge-need">Cần cập nhật</span>';
+                else                    $badge = ' <span class="vcs-badge vcs-badge-ok">Mới nhất</span>';
+            }
+            echo '<tr data-id="' . (int) $c->ID . '"><td><strong>' . esc_html($c->post_title) . '</strong>' . $badge . '</td>';
             echo '<td class="vcs-url">' . ($url ? '<a href="' . esc_url($url) . '" target="_blank" rel="noopener">' . esc_html($url) . '</a>' : '<em>Chưa có URL — thêm ở trang sửa xe</em>') . '</td>';
             echo '<td>';
             if ($url) echo '<button class="button button-primary vcs-sync" data-id="' . (int) $c->ID . '">Đồng bộ</button> <span class="vcs-status"></span>';
@@ -131,6 +143,7 @@ class VCS_Admin {
 
         $ok = VCS_Repository::apply($id, $built);
         if (!$ok) wp_send_json_error(['msg' => 'Không ghi được (thiếu Carbon Fields?).']);
+        if (!empty($built['_rev'])) update_post_meta($id, '_vcs_hub_rev', $built['_rev']); // đánh dấu đã sync rev này
         wp_send_json_success(['msg' => 'Đã đồng bộ: ' . count($built['versions']) . ' phiên bản · ' . count($built['specs']) . ' thông số.']);
     }
 
@@ -144,6 +157,7 @@ class VCS_Admin {
         if (empty($data['ok'])) return new WP_Error('fetch', $data['error'] ?: 'Lỗi tải/parse nguồn.');
         $built = VCS_Repository::build_new($id, $data);
         $built['_model'] = $data['model'];
+        $built['_rev']   = $data['rev'] ?? '';
         return $built;
     }
 

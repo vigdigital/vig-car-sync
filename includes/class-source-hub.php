@@ -40,6 +40,43 @@ class VCS_Source_Hub implements VCS_Source_Interface {
         return is_array($idx) && !empty($idx['brands']) ? $idx['brands'] : [];
     }
 
+    /**
+     * "rev" = mã băm NỘI DUNG có ý nghĩa của 1 model (giá + phiên bản + thông số).
+     * Dùng để site biết model ở hub đã đổi hay chưa (không phụ thuộc updated_at).
+     * Producer ghi rev vào index.json; consumer lưu rev đã sync → so lệch = cần cập nhật.
+     */
+    public static function rev($model) {
+        $vmap = function ($arr) {
+            $out = [];
+            foreach ((array) $arr as $s) $out[] = [(string) ($s['label'] ?? ''), (string) ($s['value'] ?? '')];
+            return $out;
+        };
+        $core = [
+            'price'    => (int) ($model['price'] ?? 0),
+            'versions' => array_map(function ($v) use ($vmap) {
+                return [
+                    'name'   => (string) ($v['name'] ?? ''),
+                    'price'  => (int) ($v['price'] ?? 0),
+                    'status' => (string) ($v['status'] ?? 'on_sale'),
+                    'specs'  => $vmap($v['specs'] ?? []),
+                ];
+            }, (array) ($model['versions'] ?? [])),
+            'specs'    => $vmap($model['specs'] ?? []),
+        ];
+        return substr(md5(wp_json_encode($core)), 0, 12);
+    }
+
+    /** Map "brand/slug" → rev từ index.json (để consumer kiểm tra hàng loạt, chỉ tải 1 file). */
+    public static function rev_index() {
+        $map = [];
+        foreach (self::index() as $b) {
+            foreach ((array) ($b['models'] ?? []) as $m) {
+                if (!empty($m['rev'])) $map[($b['brand'] ?? '') . '/' . ($m['slug'] ?? '')] = $m['rev'];
+            }
+        }
+        return $map;
+    }
+
     public function fetch($ref) {
         // ref: vighub:honda/honda-city
         $path = substr($ref, strlen('vighub:'));
@@ -81,6 +118,7 @@ class VCS_Source_Hub implements VCS_Source_Interface {
             'ok' => true, 'error' => null, 'source' => $this->id(),
             'model' => (string) ($model['name'] ?? ''), 'price' => (int) ($model['price'] ?? 0),
             'versions' => $versions, 'specs' => $specs,
+            'rev' => self::rev($model),   // mã băm nội dung để site lưu lại (biết lần sau có đổi không)
         ];
     }
 

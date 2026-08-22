@@ -46,9 +46,13 @@ class VCS_CLI {
         $source  = isset($assoc['source']) ? trim((string) $assoc['source']) : '';
         $dry     = isset($assoc['dry-run']);
         $yes     = isset($assoc['yes']);
+        $changed = isset($assoc['changed']);
 
         // Ép nguồn + lưu vào xe (khi có --post).
         if ($source !== '' && $post_id) update_post_meta($post_id, VCS_URL_META, $source);
+
+        // --changed: chỉ đụng xe có rev ở hub KHÁC rev đã sync (tải 1 file index).
+        $hubrev = $changed ? VCS_Source_Hub::rev_index() : [];
 
         // Danh sách xe cần xử lý.
         $ids = [];
@@ -65,11 +69,18 @@ class VCS_CLI {
         }
         if (!$ids) \WP_CLI::error('Không có xe nào để đồng bộ (thiếu URL nguồn?).');
 
-        $done = 0; $skip = 0; $changed_total = 0;
+        $done = 0; $skip = 0; $fresh = 0; $changed_total = 0;
         foreach ($ids as $id) {
             $title = get_the_title($id) ?: "#$id";
             $ref = ($source !== '' && (!$all)) ? $source : (string) get_post_meta($id, VCS_URL_META, true);
             if ($ref === '') { \WP_CLI::warning("[$title] chưa có URL nguồn — bỏ qua."); $skip++; continue; }
+
+            // --changed: bỏ qua xe đã khớp rev hub (không cần sync).
+            if ($changed && strpos($ref, 'vighub:') === 0) {
+                $key = substr($ref, strlen('vighub:'));
+                $cur = (string) get_post_meta($id, '_vcs_hub_rev', true);
+                if ($cur !== '' && isset($hubrev[$key]) && $hubrev[$key] === $cur) { $fresh++; continue; }
+            }
 
             $src = VCS_Sources::detect($ref);
             if (!$src) { \WP_CLI::warning("[$title] không nhận diện nguồn: $ref — bỏ qua."); $skip++; continue; }
@@ -89,12 +100,71 @@ class VCS_CLI {
 
             $ok = VCS_Repository::apply($id, $built);
             if (!$ok) { \WP_CLI::warning("[$title] KHÔNG ghi được (thiếu Carbon Fields?)."); $skip++; continue; }
+            if (!empty($data['rev'])) update_post_meta($id, '_vcs_hub_rev', $data['rev']); // đánh dấu đã sync rev này
             \WP_CLI::log("   ✓ đã ghi [$title]");
             $done++;
         }
 
-        if ($dry) \WP_CLI::success("Dry-run xong: $done xe · tổng $changed_total thay đổi · $skip bỏ qua.");
-        else      \WP_CLI::success("Đồng bộ xong: $done xe ghi · $skip bỏ qua.");
+        $tail = $fresh ? " · $fresh đã mới nhất (bỏ qua)" : '';
+        if ($dry) \WP_CLI::success("Dry-run xong: $done xe · tổng $changed_total thay đổi · $skip bỏ qua$tail.");
+        else      \WP_CLI::success("Đồng bộ xong: $done xe ghi · $skip bỏ qua$tail.");
+    }
+
+    /**
+     * STATUS: xe nào CẦN đồng bộ (so rev đã sync ↔ rev ở hub). Chỉ tải index.json.
+     *
+     * ## OPTIONS
+     *
+     * [--changed]
+     * : Chỉ liệt kê xe cần cập nhật (bỏ xe đã mới nhất).
+     *
+     * ## EXAMPLES
+     *
+     *     wp vig-car status
+     *     wp vig-car status --changed
+     *
+     * @when after_wp_load
+     */
+    public function status($args, $assoc) {
+        $only_changed = isset($assoc['changed']);
+        $hubrev = VCS_Source_Hub::rev_index();
+
+        $ids = get_posts([
+            'post_type'   => VCS_POST_TYPE, 'post_status' => 'any',
+            'numberposts' => -1, 'fields' => 'ids',
+            'meta_key'    => VCS_URL_META, 'meta_compare' => 'EXISTS',
+        ]);
+
+        $rows = []; $need = 0;
+        foreach ($ids as $id) {
+            $ref = (string) get_post_meta($id, VCS_URL_META, true);
+            $site = (string) get_post_meta($id, '_vcs_hub_rev', true);
+            if (strpos($ref, 'vighub:') === 0) {
+                $key = substr($ref, strlen('vighub:'));
+                $hub = $hubrev[$key] ?? '';
+                if ($hub === '')            $state = 'không có ở hub';
+                elseif ($site === '')       $state = 'CHƯA SYNC';
+                elseif ($site !== $hub)     $state = 'CẦN CẬP NHẬT';
+                else                        $state = 'đã mới nhất';
+            } else {
+                $key = $ref; $hub = '(nguồn khác)'; $state = $site ? 'đã sync' : 'chưa sync';
+            }
+            $is_need = in_array($state, ['CHƯA SYNC', 'CẦN CẬP NHẬT'], true);
+            if ($is_need) $need++;
+            if ($only_changed && !$is_need) continue;
+            $rows[] = [
+                'id'        => $id,
+                'xe'        => get_the_title($id) ?: "#$id",
+                'nguon'     => $key,
+                'rev_site'  => $site ?: '—',
+                'rev_hub'   => $hub ?: '—',
+                'trang_thai'=> $state,
+            ];
+        }
+
+        if (!$rows) { \WP_CLI::success($only_changed ? 'Tất cả đã mới nhất.' : 'Không có xe nào có nguồn.'); return; }
+        \WP_CLI\Utils\format_items('table', $rows, ['id', 'xe', 'nguon', 'rev_site', 'rev_hub', 'trang_thai']);
+        \WP_CLI::log("→ $need xe cần đồng bộ. Chạy: wp vig-car pull --all --changed --yes");
     }
 
     /** In gọn các dòng khác/mới của diff (bỏ dòng 'same'). */
@@ -210,7 +280,12 @@ class VCS_CLI {
             if (!is_array($b) || empty($b['brand'])) continue;
             $models = [];
             foreach ((array) ($b['models'] ?? []) as $m) {
-                $models[] = ['slug' => $m['slug'] ?? '', 'name' => $m['name'] ?? '', 'price' => (int) ($m['price'] ?? 0)];
+                $models[] = [
+                    'slug'  => $m['slug'] ?? '',
+                    'name'  => $m['name'] ?? '',
+                    'price' => (int) ($m['price'] ?? 0),
+                    'rev'   => VCS_Source_Hub::rev($m),   // mã băm nội dung → consumer biết model đã đổi chưa
+                ];
             }
             $brands[] = [
                 'brand'      => $b['brand'],
