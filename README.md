@@ -6,9 +6,21 @@ Trích xuất dữ liệu xe từ nguồn ngoài (VnExpress) → đối chiếu 
 1. Mở trang sửa 1 xe (CPT `cars`) → box **"Nguồn dữ liệu (đồng bộ)"** bên phải → dán URL VnExpress V-Car → Cập nhật.
 2. Vào **Xe → Đồng bộ dữ liệu** → bấm **Đồng bộ** ở dòng xe → hiện bảng so sánh (giá trị mới/khác **tô xanh**) → **Chấp nhận đồng bộ** để ghi đè.
 
-## Trường được đồng bộ
-- `car_price` (giá từ) · `car_versions` (tên + giá từng bản) · `car_specs` (thông số).
-- **Merge thông minh:** thông số nguồn không có (kích thước, trục cơ sở, khoảng sáng gầm…) được **giữ nguyên**, không bị xoá.
+## Trường được đồng bộ → xem **[Hợp đồng dữ liệu (docs/DATA-CONTRACT.md)](docs/DATA-CONTRACT.md)**
+
+Theme phải định nghĩa 3 Carbon Fields trên CPT `cars` (plugin tra theo tên):
+
+| Field | Kiểu | Sub-field |
+|---|---|---|
+| `car_price` | text (số) | — |
+| `car_versions` | complex (repeater) | `name`, `price` |
+| `car_specs` | complex (repeater) | `spec_label`, `spec_value` |
+
+`car_specs` là **repeater** (mỗi thông số 1 dòng), không phải mỗi thông số 1 field.
+Code đăng ký field + bộ nhãn thông số chuẩn + cách đọc ra front-end: xem [DATA-CONTRACT.md](docs/DATA-CONTRACT.md).
+
+- **Merge thông minh:** thông số nguồn không có (kích thước, trục cơ sở…) được **giữ nguyên**, không bị xoá.
+- Meta ẩn `_vcs_source_url` (tham chiếu nguồn) plugin tự quản — theme đừng đụng.
 
 ## Nguồn hỗ trợ (tự nhận diện theo URL)
 | Nguồn | URL | Ghi chú |
