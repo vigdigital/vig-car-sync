@@ -54,3 +54,15 @@
 .vcs-matrix tbody tr:hover td.vcs-hl{background:#dbeee2}
 .vcs-removed{color:#8a2424;margin:8px 0}
 .vcs-actions{margin-top:12px}
+
+/* Đồng bộ tất cả */
+.vcs-toolbar{margin:14px 0}
+.vcs-all-status{margin-left:12px;font-weight:600}
+.vcs-all-status.busy{color:#b26b00}
+.vcs-all-status.ok{color:#1e7e34}
+.vcs-all-status.error{color:#b32d2e}
+.vcs-allresult{border-collapse:collapse;margin:8px 0 18px;min-width:520px}
+.vcs-allresult th,.vcs-allresult td{border:1px solid #e0e0e2;padding:7px 12px;text-align:left;font-size:13px}
+.vcs-allresult th{background:#f0f0f1}
+.vcs-allresult tr.vcs-r-ok td:nth-child(2){color:#1e7e34;font-weight:600}
+.vcs-allresult tr.vcs-r-skip td:nth-child(2){color:#b32d2e;font-weight:600}

@@ -5,7 +5,7 @@
     var body = new URLSearchParams();
     body.set('action', action);
     body.set('nonce', VCS.nonce);
-    body.set('id', id);
+    if (id) body.set('id', id);
     return fetch(VCS.ajax, { method: 'POST', credentials: 'same-origin', body: body })
       .then(function (r) { return r.json(); });
   }
@@ -25,6 +25,24 @@
 
   // Bấm "Đồng bộ" → preview diff
   document.addEventListener('click', function (e) {
+    // Đồng bộ TẤT CẢ
+    var allBtn = e.target.closest('.vcs-sync-all');
+    if (allBtn) {
+      if (!window.confirm('Đồng bộ TẤT CẢ xe từ VIG Car Hub?\nDữ liệu hiện tại sẽ được ghi đè bằng dữ liệu kho.')) return;
+      var st = document.querySelector('.vcs-all-status');
+      allBtn.disabled = true;
+      if (st) { st.textContent = 'Đang đồng bộ tất cả… (đừng đóng trang)'; st.className = 'vcs-all-status busy'; }
+      post('vcs_apply_all').then(function (res) {
+        allBtn.disabled = false;
+        if (!res.success) { if (st) { st.textContent = res.data && res.data.msg ? res.data.msg : 'Lỗi'; st.className = 'vcs-all-status error'; } return; }
+        if (st) { st.textContent = res.data.summary; st.className = 'vcs-all-status ok'; }
+        var box = document.getElementById('vcs-all-result');
+        if (box) box.innerHTML = res.data.html;
+        setTimeout(function () { location.reload(); }, 2500); // refresh badge Cần cập nhật/Mới nhất
+      }).catch(function () { allBtn.disabled = false; if (st) { st.textContent = 'Lỗi kết nối'; st.className = 'vcs-all-status error'; } });
+      return;
+    }
+
     var syncBtn = e.target.closest('.vcs-sync');
     if (syncBtn) {
       var id = syncBtn.dataset.id;

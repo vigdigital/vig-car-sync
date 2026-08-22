@@ -10,6 +10,7 @@ class VCS_Admin {
         add_action('admin_enqueue_scripts', [__CLASS__, 'assets']);
         add_action('wp_ajax_vcs_preview', [__CLASS__, 'ajax_preview']);
         add_action('wp_ajax_vcs_apply', [__CLASS__, 'ajax_apply']);
+        add_action('wp_ajax_vcs_apply_all', [__CLASS__, 'ajax_apply_all']);
     }
 
     /* ---------- Metabox: URL nguồn trên mỗi xe ---------- */
@@ -80,6 +81,8 @@ class VCS_Admin {
         $flush_url = wp_nonce_url(add_query_arg(['page' => 'vcs-sync', 'vcs_flush' => 1], admin_url('edit.php?post_type=' . VCS_POST_TYPE)), 'vcs_flush');
         echo '<div class="wrap vcs-wrap"><h1>Đồng bộ dữ liệu xe từ nguồn</h1>';
         echo '<p class="description">Trích xuất giá · phiên bản · thông số từ nguồn → đối chiếu với dữ liệu hiện tại. <span class="vcs-legend"><i class="vcs-dot vcs-new"></i> giá trị mới/khác sẽ tô xanh</span>. Bấm <strong>Chấp nhận</strong> để ghi đè. · <a href="' . esc_url($flush_url) . '">🔄 Làm mới dữ liệu Hub</a> (nếu vừa cập nhật kho mà chưa thấy đổi).</p>';
+        echo '<p class="vcs-toolbar"><button class="button button-primary button-hero vcs-sync-all">⟳ Đồng bộ tất cả</button> <span class="vcs-all-status"></span></p>';
+        echo '<div id="vcs-all-result"></div>';
         echo '<table class="widefat striped vcs-list"><thead><tr><th style="width:240px">Dòng xe</th><th>URL nguồn</th><th style="width:230px">Thao tác</th></tr></thead><tbody>';
         foreach ($cars as $c) {
             $url = get_post_meta($c->ID, VCS_URL_META, true);
@@ -149,6 +152,30 @@ class VCS_Admin {
         if (!$ok) wp_send_json_error(['msg' => 'Không ghi được (thiếu Carbon Fields?).']);
         if (!empty($built['_rev'])) update_post_meta($id, '_vcs_hub_rev', $built['_rev']); // đánh dấu đã sync rev này
         wp_send_json_success(['msg' => 'Đã đồng bộ: ' . count($built['versions']) . ' phiên bản · ' . count($built['specs']) . ' thông số.']);
+    }
+
+    /** Đồng bộ TẤT CẢ xe (ghi thẳng theo dữ liệu Hub). Báo cáo từng xe. */
+    public static function ajax_apply_all() {
+        check_ajax_referer('vcs_sync', 'nonce');
+        if (!current_user_can('edit_posts')) wp_send_json_error(['msg' => 'Không có quyền.']);
+
+        VCS_Source_Hub::flush(); // lấy data Hub mới nhất
+        $cars = get_posts(['post_type' => VCS_POST_TYPE, 'numberposts' => -1, 'orderby' => 'menu_order', 'order' => 'ASC', 'post_status' => 'any']);
+        $rows = ''; $ok = 0; $skip = 0; $changed_total = 0;
+        foreach ($cars as $c) {
+            $row = function ($state, $cls, $detail) use ($c) {
+                return '<tr class="' . $cls . '"><td>' . esc_html($c->post_title) . '</td><td>' . esc_html($state) . '</td><td>' . esc_html($detail) . '</td></tr>';
+            };
+            $built = self::fetch_and_build($c->ID);
+            if (is_wp_error($built)) { $rows .= $row('bỏ qua', 'vcs-r-skip', $built->get_error_message()); $skip++; continue; }
+            $n = VCS_Differ::count_changes(VCS_Differ::diff(VCS_Repository::current($c->ID), $built));
+            if (!VCS_Repository::apply($c->ID, $built)) { $rows .= $row('bỏ qua', 'vcs-r-skip', 'không ghi được (thiếu Carbon Fields?)'); $skip++; continue; }
+            if (!empty($built['_rev'])) update_post_meta($c->ID, '_vcs_hub_rev', $built['_rev']);
+            $rows .= $row('✔ xong', 'vcs-r-ok', $n ? ($n . ' thay đổi đã ghi') : 'đã mới nhất');
+            $ok++; $changed_total += $n;
+        }
+        $html = '<table class="vcs-allresult"><thead><tr><th>Xe</th><th>Kết quả</th><th>Chi tiết</th></tr></thead><tbody>' . $rows . '</tbody></table>';
+        wp_send_json_success(['html' => $html, 'summary' => "Xong: {$ok} xe ghi · {$skip} bỏ qua · tổng {$changed_total} thay đổi"]);
     }
 
     /** Fetch nguồn + build dữ liệu mới đã map. Trả WP_Error nếu lỗi. */
