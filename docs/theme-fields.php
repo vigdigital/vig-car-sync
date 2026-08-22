@@ -1,6 +1,10 @@
 <?php
 /**
- * VIG Car Sync — Carbon Fields cho CPT `cars` (dán vào THEME hbtn).
+ * VIG Car Sync — Carbon Fields cho CPT `cars` — MẪU GENERIC (specs lồng).
+ *
+ * ⚠️ KHÔNG dùng cho site HBTN. Theme hbtn dùng field PHẲNG ver_* (ver_engine, ver_seats…),
+ *    và Repository đang ship map sang ver_* — xem docs/hbtn-theme-integration.md.
+ *    File này chỉ để tham chiếu cho THEME MỚI muốn dùng specs lồng.
  *
  * Cách dùng: copy toàn bộ khối add_action bên dưới vào file khai báo Carbon Fields
  * của theme (thường là functions.php của child theme, chỗ đang có

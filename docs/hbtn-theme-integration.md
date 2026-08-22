@@ -91,12 +91,16 @@ foreach ($versions as $i => $v) :
 
 ## Điều kiện để override hiển thị (quan trọng)
 
-JS chỉ ghi đè được dòng thông số **đã tồn tại** trong bảng "Thông số kỹ thuật" chung (`car_specs`) — vì nó tìm phần tử `[data-spec-key]`. Nên bảng chung của mỗi xe **phải có sẵn dòng** cho các nhãn: `Số chỗ ngồi`, `Dẫn động`, `Mức tiêu thụ (hỗn hợp)`, `Trọng lượng (bản thân)` (giá trị mặc định = bản base). **Plugin VIG Car Sync sẽ tự ghi** các dòng này khi đồng bộ, nên team theme không phải nhập tay — chỉ cần đảm bảo `car_specs` không giới hạn thiếu (hiện `->set_max(12)`; các nhãn chung của CR-V ~13–14 → **nâng `set_max` lên 16** hoặc bỏ giới hạn).
+JS chỉ ghi đè được dòng thông số **đã tồn tại** trong bảng "Thông số kỹ thuật" chung (`car_specs`) — vì nó tìm phần tử `[data-spec-key]`. Nên bảng chung của mỗi xe **phải có sẵn dòng** cho các nhãn: `Số chỗ ngồi`, `Dẫn động`, `Mức tiêu thụ (hỗn hợp)`, `Trọng lượng (bản thân)` (giá trị mặc định = bản base). **Plugin VIG Car Sync tự ghi** các dòng này khi đồng bộ, nên team theme không phải nhập tay.
+
+Plugin ghi `car_specs` = **9 thông số của bản base** (động cơ, công suất, mô-men, hộp số, nhiên liệu, số chỗ, dẫn động, tiêu thụ, trọng lượng — các dòng sẽ được override) **+ ~13 thông số chung của dòng** (kích thước, gầm, lốp, treo, phanh…). Với CR-V là **~22 dòng** → cần **nâng `set_max`** (hiện `12`):
 
 ```php
 // trong car_specs:
-->set_max(16)   // cũ: 12 — nâng để đủ chỗ thông số chung
+->set_max(24)   // cũ: 12 — nâng để đủ 9 spec bản base + ~13 spec chung (hoặc bỏ hẳn set_max)
 ```
+
+> Bảng chung sẽ dài hơn trước (~22 dòng thay vì ~12). Nếu muốn gọn, team theme có thể style/gộp hiển thị — nhưng **giữ đủ 9 dòng có `data-spec-key`** để cơ chế override theo bản còn chạy.
 
 ---
 
