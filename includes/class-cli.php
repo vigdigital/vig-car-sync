@@ -87,5 +87,32 @@ class VCS_CLI {
             file_put_contents($out_file, wp_json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
             \WP_CLI::success("$brand → $out_file ({$payload['count']} model · $ok ok · $fail lỗi)");
         }
+
+        // index.json: gom mọi brand file để dealer duyệt nhanh (không tải hết từng file).
+        $this->write_index($out_dir);
+    }
+
+    /** Quét mọi <brand>.json trong out → index.json (brands + model tóm tắt). */
+    private function write_index($out_dir) {
+        $brands = [];
+        foreach ((array) glob("$out_dir/*.json") as $f) {
+            if (basename($f) === 'index.json') continue;
+            $b = json_decode((string) file_get_contents($f), true);
+            if (!is_array($b) || empty($b['brand'])) continue;
+            $models = [];
+            foreach ((array) ($b['models'] ?? []) as $m) {
+                $models[] = ['slug' => $m['slug'] ?? '', 'name' => $m['name'] ?? '', 'price' => (int) ($m['price'] ?? 0)];
+            }
+            $brands[] = [
+                'brand'      => $b['brand'],
+                'brand_name' => $b['brand_name'] ?? ucfirst($b['brand']),
+                'file'       => basename($f),
+                'count'      => count($models),
+                'models'     => $models,
+            ];
+        }
+        $index = ['updated_at' => gmdate('c'), 'brands' => $brands];
+        file_put_contents("$out_dir/index.json", wp_json_encode($index, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        \WP_CLI::log('index.json: ' . count($brands) . ' hãng.');
     }
 }

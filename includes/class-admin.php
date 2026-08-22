@@ -20,21 +20,48 @@ class VCS_Admin {
     public static function metabox_html($post) {
         wp_nonce_field('vcs_save_url', 'vcs_url_nonce');
         $url = get_post_meta($post->ID, VCS_URL_META, true);
-        echo '<p><label for="vcs_url"><strong>URL nguồn (VnExpress)</strong></label></p>';
-        echo '<input type="url" id="vcs_url" name="vcs_url" value="' . esc_attr($url) . '" placeholder="https://vnexpress.net/oto-xe-may/v-car/dong-xe/..." style="width:100%">';
-        echo '<p class="description">Dán link trang dòng xe trên VnExpress. Sau đó vào <em>Xe → Đồng bộ dữ liệu</em> để đối chiếu & cập nhật.</p>';
+
+        // Dropdown chọn từ kho VIG Car Hub (nhanh, không cần dán link).
+        $brands = VCS_Source_Hub::index();
+        if ($brands) {
+            echo '<p><label for="vcs_hub_pick"><strong>Chọn từ kho VIG Car Hub</strong></label></p>';
+            echo '<select id="vcs_hub_pick" style="width:100%"><option value="">— chọn model —</option>';
+            foreach ($brands as $b) {
+                echo '<optgroup label="' . esc_attr($b['brand_name'] ?? $b['brand']) . '">';
+                foreach ((array) ($b['models'] ?? []) as $m) {
+                    $ref = 'vighub:' . $b['brand'] . '/' . ($m['slug'] ?? '');
+                    $lbl = ($m['name'] ?? $m['slug']) . ($m['price'] ? ' — ' . number_format((int) $m['price'], 0, ',', '.') . 'đ' : '');
+                    echo '<option value="' . esc_attr($ref) . '"' . selected($url, $ref, false) . '>' . esc_html($lbl) . '</option>';
+                }
+                echo '</optgroup>';
+            }
+            echo '</select>';
+            echo '<p class="description" style="margin:4px 0 10px">Hoặc dán link nguồn (Honda/VnExpress) bên dưới.</p>';
+        }
+
+        echo '<p><label for="vcs_url"><strong>Tham chiếu nguồn</strong></label></p>';
+        echo '<input type="text" id="vcs_url" name="vcs_url" value="' . esc_attr($url) . '" placeholder="vighub:honda/honda-city  hoặc  https://vnexpress.net/..." style="width:100%">';
+        echo '<p class="description"><code>vighub:hãng/slug</code> (kho VIG) hoặc link Honda/VnExpress. Sau đó vào <em>Xe → Đồng bộ dữ liệu</em> để đối chiếu.</p>';
         if ($url) {
             $page = admin_url('edit.php?post_type=' . VCS_POST_TYPE . '&page=vcs-sync');
             echo '<p><a class="button button-secondary" href="' . esc_url($page) . '">Mở trang đồng bộ</a></p>';
         }
+        // đổ lựa chọn dropdown vào ô input
+        echo '<script>(function(){var s=document.getElementById("vcs_hub_pick"),u=document.getElementById("vcs_url");if(s&&u)s.addEventListener("change",function(){if(s.value)u.value=s.value;});})();</script>';
     }
 
     public static function save_metabox($post_id) {
         if (!isset($_POST['vcs_url_nonce']) || !wp_verify_nonce($_POST['vcs_url_nonce'], 'vcs_save_url')) return;
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
         if (!current_user_can('edit_post', $post_id)) return;
-        $url = isset($_POST['vcs_url']) ? esc_url_raw(trim($_POST['vcs_url'])) : '';
-        if ($url) update_post_meta($post_id, VCS_URL_META, $url);
+        $raw = isset($_POST['vcs_url']) ? trim(wp_unslash($_POST['vcs_url'])) : '';
+        // Chấp nhận cả tham chiếu hub (vighub:hãng/slug) lẫn URL http(s).
+        if (strpos($raw, 'vighub:') === 0) {
+            $val = preg_replace('~[^a-z0-9:/_-]~i', '', $raw); // slug an toàn
+        } else {
+            $val = esc_url_raw($raw);
+        }
+        if ($val) update_post_meta($post_id, VCS_URL_META, $val);
         else delete_post_meta($post_id, VCS_URL_META);
     }
 
