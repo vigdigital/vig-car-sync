@@ -1,6 +1,9 @@
 # HBTN theme — CHỈ các đoạn cần chỉnh
 
-Yêu cầu: plugin VIG Car Sync ≥ 0.8.0. `js/car.js` **không đổi**.
+Yêu cầu: plugin VIG Car Sync ≥ 0.8.0.
+
+> ⚠️ **`js/car.js` CÓ sửa** (1 đoạn nhỏ — xem File 3). Vì thiết kế 2 bảng (ngắn + đầy đủ) khiến 1 `data-spec-key`
+> xuất hiện ở **2 phần tử**; car.js cũ chỉ giữ 1 phần tử/key nên bảng ngắn ngừng đổi khi bấm bản. Phải gom mảng.
 
 ---
 
@@ -84,7 +87,46 @@ $ver_specs_json = function ($v) {
 
 ---
 
-## FILE 3 — CSS (thêm vào style của theme)
+## FILE 3 — `js/car.js` (BẮT BUỘC với thiết kế 2 bảng)
+
+Trong đoạn khởi tạo `specEls` + hàm `applySpecs`, **thay** để mỗi key giữ **nhiều phần tử**:
+
+**Thay:**
+```js
+var specEls = {};
+[].slice.call(document.querySelectorAll('[data-spec-key]')).forEach(function (el) {
+  specEls[el.dataset.specKey] = { el: el, def: el.textContent };
+});
+function applySpecs(specsJson) {
+  var overrides = {};
+  try { overrides = JSON.parse(specsJson || '{}'); } catch (e) {}
+  Object.keys(specEls).forEach(function (key) {
+    var entry = specEls[key];
+    entry.el.textContent = overrides[key] ? overrides[key] : entry.def;
+  });
+}
+```
+**Bằng:**
+```js
+var specEls = {};
+[].slice.call(document.querySelectorAll('[data-spec-key]')).forEach(function (el) {
+  var k = el.dataset.specKey;
+  (specEls[k] = specEls[k] || []).push({ el: el, def: el.textContent });   // mảng: gom MỌI phần tử cùng key
+});
+function applySpecs(specsJson) {
+  var overrides = {};
+  try { overrides = JSON.parse(specsJson || '{}'); } catch (e) {}
+  Object.keys(specEls).forEach(function (key) {
+    specEls[key].forEach(function (entry) {                                 // cập nhật CẢ bảng ngắn lẫn đầy đủ
+      entry.el.textContent = overrides[key] ? overrides[key] : entry.def;
+    });
+  });
+}
+```
+
+---
+
+## FILE 4 — CSS (thêm vào style của theme)
 
 ```css
 .specs-full > summary{cursor:pointer;color:#c00;font-weight:600;padding:8px 0;list-style:none}

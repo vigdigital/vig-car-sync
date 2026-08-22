@@ -99,6 +99,6 @@ Trang chi tiết xe không chỉ có bảng thông số. Tab phiên bản (`.vta
 1. **Plugin:** thêm hàm `vig_car_data($id)` (đọc car_versions + car_specs → mảng chuẩn) + đổi Repository lưu specs bản dạng **repeater** thay vì `ver_*`. Cung cấp cả `car_versions.specs` (complex lồng) — đã có sẵn trong contract generic.
 2. **Theme:** thay khối render specs cứng trong `single-cars.php` bằng vòng lặp trên `vig_car_data()`; `$ver_specs_json` sinh động từ mảng (không liệt kê field). Bỏ `$spec_key_map` cứng → sinh key tự động từ nhãn.
 3. **Migrate:** 1 lần chuyển dữ liệu `ver_*` hiện có → repeater (script hoặc sync lại từ hub).
-4. `car.js` **không đổi** (đã generic theo `data-spec-key`).
+4. `car.js` sửa 1 đoạn nhỏ nếu render **2 bảng** (ngắn+đầy đủ): gom `specEls[key]` thành mảng để cập nhật mọi phần tử cùng key (bản gốc chỉ giữ 1 phần tử/key → bảng thứ 2 đè mất bảng đầu). Xem `hbtn-changeset.md` File 3.
 
 > Ước lượng: nửa ngày công (plugin + theme + test 1 xe). Sau đó thêm/bớt bất cứ thứ gì = chỉ data.

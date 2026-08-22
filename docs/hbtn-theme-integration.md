@@ -6,7 +6,7 @@
 **Nguyên tắc:** theme không đọc field cố định (`ver_engine`…) nữa. Thay bằng:
 - Thông số riêng của bản = **1 repeater `specs`** (nhãn/giá-trị) trong `car_versions`.
 - Theme lấy dữ liệu qua hàm plugin **`vig_car_data()`** rồi **lặp generic**.
-- `js/car.js` **KHÔNG đổi** (đã override theo `data-spec-key`).
+- `js/car.js` **sửa 1 đoạn nhỏ** (gom nhiều phần tử/key — vì thiết kế 2 bảng; xem cuối tài liệu).
 
 > Cần plugin **VIG Car Sync ≥ 0.7.0** (cung cấp `vig_car_data()`).
 
@@ -145,9 +145,20 @@ Giữ nguyên cấu trúc — chỉ đảm bảo lặp trên `$versions` (đã l
 
 ---
 
-## `js/car.js` — KHÔNG đổi ✅
+## `js/car.js` — CÓ sửa 1 đoạn (nếu render 2 bảng) ⚠️
 
-Cơ chế override đã generic: nó lấy mọi `[data-spec-key]`, và với mỗi bản đọc `data-specs` (map key→giá trị) để thay. Vì `data-spec-key` (ở bảng chung) và key trong `data-specs` (ở bản) đều = `sanitize_title(nhãn)` do **plugin** cấp → luôn khớp. Máy tính **giá lăn bánh** cũng không đổi (vẫn đọc `data-price` của bản đang chọn).
+Cơ chế override generic vẫn đúng (key = `sanitize_title(nhãn)` do plugin cấp, khớp giữa bảng và bản). **NHƯNG** khi hiện **2 bảng** (ngắn + đầy đủ), **1 `data-spec-key` xuất hiện ở 2 phần tử**. `car.js` gốc lưu `specEls[key]` = **1 object** → phần tử sau đè phần tử trước ⇒ **bảng ngắn ngừng cập nhật** khi bấm bản (không lỗi, im lặng).
+
+**Fix:** gom `specEls[key]` thành **mảng** để cập nhật mọi phần tử cùng key (xem File 3 trong [hbtn-changeset.md](hbtn-changeset.md)):
+```js
+// khởi tạo:
+var k = el.dataset.specKey; (specEls[k] = specEls[k] || []).push({ el: el, def: el.textContent });
+// applySpecs: specEls[key].forEach(entry => entry.el.textContent = overrides[key] ? overrides[key] : entry.def);
+```
+
+> **Ghi chú cho theme khác:** nếu bạn render CÙNG 1 spec ở **>1 chỗ** (vd bảng ngắn + bảng đầy đủ, hoặc lặp lại ở section khác) thì bắt buộc dùng cách "nhiều phần tử/key" này. Chỉ render 1 chỗ thì bản `car.js` gốc (1 object/key) vẫn chạy.
+
+Máy tính **giá lăn bánh** không đổi (vẫn đọc `data-price` của bản đang chọn).
 
 ---
 
