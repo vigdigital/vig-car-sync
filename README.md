@@ -28,7 +28,7 @@ Code đăng ký field + bộ nhãn thông số chuẩn + cách đọc ra front-e
 | **Honda VN (chính hãng)** | `honda.com.vn/o-to/chi-tiet/{id}` | **Nguồn chính** — 13 thông số đầy đủ: kích thước, trục cơ sở, khoảng sáng gầm, cỡ lốp, trọng lượng, mức tiêu thụ + giá mới nhất |
 | VnExpress V-Car | `vnexpress.net/.../v-car/dong-xe/...` | Dự phòng — thiếu kích thước |
 
-Map ID Honda (honda.com.vn/o-to/chi-tiet/N): **City=2 · Civic=19 · CR-V=17 · HR-V=21 · BR-V=18 · Accord=20**.
+Map ID Honda (honda.com.vn/o-to/chi-tiet/N): **City=2 · Civic=19 · Civic Type R=20 · CR-V=17 · HR-V=21 · BR-V=18** (Accord đã ngừng bán VN).
 
 Ghép tên phiên bản ↔ giá theo `data-version` (index), không theo thứ tự DOM — chịu được bản trùng/ẩn (vd CR-V có 5 bản, index không tuần tự). Công suất/mô-men bản hybrid rút gọn "tổng hệ hybrid" / "mô-tơ điện".
 
