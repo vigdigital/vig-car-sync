@@ -3,8 +3,21 @@
 Trích xuất dữ liệu xe từ nguồn ngoài (VnExpress) → đối chiếu & đồng bộ vào website. Nguyên mẫu cho **VIG Data Engine** (Data Engine theo hãng, bơm data cho nhiều site sale).
 
 ## Dùng
-1. Mở trang sửa 1 xe (CPT `cars`) → box **"Nguồn dữ liệu (đồng bộ)"** bên phải → dán URL VnExpress V-Car → Cập nhật.
+
+**Cách 1 — WP-Admin:**
+1. Mở trang sửa 1 xe (CPT `cars`) → box **"Nguồn dữ liệu (đồng bộ)"** bên phải → dán URL nguồn (vd `vighub:honda/honda-cr-v`, hoặc URL Honda/VnExpress) → Cập nhật.
 2. Vào **Xe → Đồng bộ dữ liệu** → bấm **Đồng bộ** ở dòng xe → hiện bảng so sánh (giá trị mới/khác **tô xanh**) → **Chấp nhận đồng bộ** để ghi đè.
+
+**Cách 2 — WP-CLI** (consumer, tự động hoá):
+```bash
+# đồng bộ 1 xe, ép nguồn + lưu vào xe, ghi luôn:
+wp vig-car pull --post=123 --source=vighub:honda/honda-cr-v --yes
+# xem trước thay đổi mọi xe, không ghi:
+wp vig-car pull --all --dry-run
+# đồng bộ mọi xe (có hỏi xác nhận từng xe):
+wp vig-car pull --all
+```
+> `wp vig-car build …` là lệnh **PRODUCER** (tạo file JSON kho, chạy ở máy build của VIG) — khác `pull`.
 
 ## Trường được đồng bộ → xem **[Hợp đồng dữ liệu (docs/DATA-CONTRACT.md)](docs/DATA-CONTRACT.md)**
 

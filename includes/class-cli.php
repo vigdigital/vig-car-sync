@@ -13,6 +13,103 @@ defined('ABSPATH') || exit;
 class VCS_CLI {
 
     /**
+     * PULL (consumer): kéo dữ liệu từ nguồn (VIG Car Hub / Honda / VnExpress) → ghi vào xe.
+     * Tương đương bấm "Đồng bộ" trong WP-Admin, nhưng chạy dòng lệnh.
+     *
+     * ## OPTIONS
+     *
+     * [--post=<id>]
+     * : ID 1 xe (CPT cars) cần đồng bộ.
+     *
+     * [--all]
+     * : Đồng bộ MỌI xe có sẵn URL nguồn (bỏ qua --post).
+     *
+     * [--source=<ref>]
+     * : Ép nguồn cho lần chạy này (vd vighub:honda/honda-cr-v). Kèm --post sẽ lưu luôn vào xe.
+     *
+     * [--dry-run]
+     * : Chỉ xem bảng thay đổi, KHÔNG ghi.
+     *
+     * [--yes]
+     * : Ghi luôn, không hỏi xác nhận.
+     *
+     * ## EXAMPLES
+     *
+     *     wp vig-car pull --post=123 --source=vighub:honda/honda-cr-v --yes
+     *     wp vig-car pull --all --dry-run
+     *
+     * @when after_wp_load
+     */
+    public function pull($args, $assoc) {
+        $post_id = isset($assoc['post']) ? (int) $assoc['post'] : 0;
+        $all     = isset($assoc['all']);
+        $source  = isset($assoc['source']) ? trim((string) $assoc['source']) : '';
+        $dry     = isset($assoc['dry-run']);
+        $yes     = isset($assoc['yes']);
+
+        // Ép nguồn + lưu vào xe (khi có --post).
+        if ($source !== '' && $post_id) update_post_meta($post_id, VCS_URL_META, $source);
+
+        // Danh sách xe cần xử lý.
+        $ids = [];
+        if ($all) {
+            $ids = get_posts([
+                'post_type'   => VCS_POST_TYPE, 'post_status' => 'any',
+                'numberposts' => -1, 'fields' => 'ids',
+                'meta_key'    => VCS_URL_META, 'meta_compare' => 'EXISTS',
+            ]);
+        } elseif ($post_id) {
+            $ids = [$post_id];
+        } else {
+            \WP_CLI::error('Cần --post=<id> hoặc --all.');
+        }
+        if (!$ids) \WP_CLI::error('Không có xe nào để đồng bộ (thiếu URL nguồn?).');
+
+        $done = 0; $skip = 0; $changed_total = 0;
+        foreach ($ids as $id) {
+            $title = get_the_title($id) ?: "#$id";
+            $ref = ($source !== '' && (!$all)) ? $source : (string) get_post_meta($id, VCS_URL_META, true);
+            if ($ref === '') { \WP_CLI::warning("[$title] chưa có URL nguồn — bỏ qua."); $skip++; continue; }
+
+            $src = VCS_Sources::detect($ref);
+            if (!$src) { \WP_CLI::warning("[$title] không nhận diện nguồn: $ref — bỏ qua."); $skip++; continue; }
+            $data = $src->fetch($ref);
+            if (empty($data['ok'])) { \WP_CLI::warning("[$title] lỗi nguồn: " . ($data['error'] ?: '?')); $skip++; continue; }
+
+            $built = VCS_Repository::build_new($id, $data);
+            $diff  = VCS_Differ::diff(VCS_Repository::current($id), $built);
+            $n     = VCS_Differ::count_changes($diff);
+            $changed_total += $n;
+
+            \WP_CLI::log("── [$title] nguồn=" . $data['source'] . " · " . count($built['versions']) . " bản · " . count($built['specs']) . " spec chung · thay đổi: $n");
+            self::print_diff_rows($diff);
+
+            if ($dry) { \WP_CLI::log('   (dry-run: không ghi)'); $done++; continue; }
+            if (!$yes) \WP_CLI::confirm("   Ghi thay đổi cho [$title]?");
+
+            $ok = VCS_Repository::apply($id, $built);
+            if (!$ok) { \WP_CLI::warning("[$title] KHÔNG ghi được (thiếu Carbon Fields?)."); $skip++; continue; }
+            \WP_CLI::log("   ✓ đã ghi [$title]");
+            $done++;
+        }
+
+        if ($dry) \WP_CLI::success("Dry-run xong: $done xe · tổng $changed_total thay đổi · $skip bỏ qua.");
+        else      \WP_CLI::success("Đồng bộ xong: $done xe ghi · $skip bỏ qua.");
+    }
+
+    /** In gọn các dòng khác/mới của diff (bỏ dòng 'same'). */
+    private static function print_diff_rows($diff) {
+        $mark = ['changed' => '~', 'new' => '+', 'removed' => '-'];
+        foreach (['price', 'versions', 'specs'] as $g) {
+            foreach ((array) $diff[$g] as $r) {
+                if (($r['status'] ?? 'same') === 'same') continue;
+                $m = $mark[$r['status']] ?? '?';
+                \WP_CLI::log(sprintf('     %s %-22s %s → %s', $m, $r['field'], $r['current'], $r['new']));
+            }
+        }
+    }
+
+    /**
      * Scrape các URL trong sources.json → ghi data/<brand>.json (merge theo source_url).
      *
      * [--sources=<file>] : đường dẫn sources.json (mặc định ./sources.json)
