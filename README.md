@@ -8,7 +8,10 @@ Trích xuất dữ liệu xe từ nguồn ngoài (VnExpress) → đối chiếu 
 1. Mở trang sửa 1 xe (CPT `cars`) → box **"Nguồn dữ liệu (đồng bộ)"** bên phải → dán URL nguồn (vd `vighub:honda/honda-cr-v`, hoặc URL Honda/VnExpress) → Cập nhật.
 2. Vào **Xe → Đồng bộ dữ liệu** → bấm **Đồng bộ** ở dòng xe → hiện bảng so sánh (giá trị mới/khác **tô xanh**) → **Chấp nhận đồng bộ** để ghi đè.
 
-**Cách 2 — WP-CLI** (consumer, tự động hoá):
+**Cách 2 — WP-CLI** (TUỲ CHỌN — chỉ site có **SSH + `wp`**; để tự động hoá):
+
+> Site **không có SSH/WP-CLI** (vd HBTN) dùng **Cách 1 (WP-Admin)** — trang **Xe → Đồng bộ** tải Hub qua HTTP phía server rồi ghi, y hệt CLI, kèm nhãn *Cần cập nhật/Mới nhất* để biết xe nào cần. Không cần viết script HTTP riêng.
+
 ```bash
 # XEM xe nào cần đồng bộ (chỉ tải index.json, so mã rev):
 wp vig-car status               # tất cả xe: Mới nhất / Cần cập nhật / Chưa sync

@@ -38,6 +38,9 @@ Field::make('complex', 'car_versions', __('Phiên bản & giá', 'hbtn-theme'))
 - **Bỏ** các field `ver_engine, ver_power, ver_torque, ver_transmission, ver_fuel` + `separator` cũ.
 - `car_specs` (chung): nâng giới hạn — `->set_max(24)` hoặc bỏ `set_max` (dòng có thể ~22).
 
+> ⚠️ **AN TOÀN DATA (đọc kỹ):** Khi xoá field `ver_*` khỏi schema, Carbon Fields **ngừng trả về** chúng qua `carbon_get_post_meta()` **dù dữ liệu vẫn nằm nguyên trong DB**. Nếu bạn đã nhập tay thông số riêng theo bản (HR-V, Civic e:HEV…), chúng sẽ **im lặng biến mất khỏi hiển thị**.
+> → Plugin **≥ 0.7.1** đã có **fallback đọc thẳng postmeta thô** nên KHÔNG mất data khi hiển thị. Nhưng vẫn **BẮT BUỘC**: sau khi sửa xong, **chạy đồng bộ lại từng xe 1 lần** (xem cuối tài liệu) để plugin **ghi dữ liệu sang cấu trúc mới `specs`** — nếu không, dữ liệu chỉ "sống" nhờ fallback, dễ mất khi thao tác về sau. **Đừng xoá `ver_*` trên site đang chạy nếu plugin < 0.7.1.**
+
 ---
 
 ## Việc 2 — `single-cars.php`
@@ -109,12 +112,19 @@ Cơ chế override đã generic: nó lấy mọi `[data-spec-key]`, và với m�
 
 ---
 
-## Sau khi sửa: chạy lại đồng bộ để nạp đúng cấu trúc
+## Sau khi sửa: chạy lại đồng bộ 1 lần để GHI sang cấu trúc mới
 
-Data cũ (nếu nhập tay theo `ver_*`) vẫn ĐỌC được (plugin có fallback), nhưng nên **sync lại** để bảng chung có đủ dòng cho override:
+Bước này **ghi dữ liệu sang `specs` lồng** (không còn chỉ sống nhờ fallback) + đảm bảo bảng chung đủ dòng để override. Chọn **1 trong 2 cách** tuỳ site:
+
+**Cách A — WP-Admin (không cần SSH/WP-CLI) — dùng cho HBTN:**
+Vào **Xe → Đồng bộ dữ liệu** → mỗi dòng xe bấm **Đồng bộ** → **Chấp nhận**. Trang này tự tải Hub qua HTTP phía server rồi ghi — **không cần WP-CLI**. (Cạnh mỗi xe có nhãn *Cần cập nhật / Mới nhất* để biết xe nào cần.)
+
+**Cách B — WP-CLI (chỉ site có SSH + `wp`) — tuỳ chọn, để tự động hoá:**
 ```bash
 wp vig-car pull --all --changed --yes
 ```
+
+> ⚠️ **Lưu ý về "đồng bộ lại":** nếu xe lấy nguồn từ Hub (`vighub:…`), đồng bộ sẽ ghi **theo dữ liệu Hub**. Với model mà Hub **chưa có** thông số riêng của bản (vd HR-V, Civic hiện chưa có), đồng bộ sẽ **không tự điền** phần đó — thông số riêng bạn **nhập tay** vẫn được **fallback giữ lại khi hiển thị**, và sẽ được ghi sang `specs` mới khi bạn **Cập nhật (lưu) lại bài xe** đó trong admin. Muốn Hub có sẵn thông số riêng cho HR-V/Civic thì bổ sung vào kho `vig-car-data` (như đã làm cho CR-V).
 
 ## Từ nay về sau
 

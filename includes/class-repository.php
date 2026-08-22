@@ -33,7 +33,7 @@ class VCS_Repository {
         return trim(preg_replace('/^\s*honda\s+/i', '', $t));
     }
 
-    /** Fallback: đọc ver_* của 1 phiên bản (dữ liệu cũ) → [[label,value]]. */
+    /** Fallback 2: đọc ver_* từ mảng Carbon (chỉ được khi theme CÒN khai báo field). */
     private static function read_ver_specs($v) {
         $out = [];
         foreach (self::VER_MAP as $label => $field) {
@@ -42,7 +42,43 @@ class VCS_Repository {
         return $out;
     }
 
-    /** Đọc specs lồng của 1 phiên bản; nếu trống → fallback ver_* cũ. */
+    /**
+     * Fallback 3 (an toàn nhất): đọc ver_* THẲNG từ postmeta thô — KHÔNG qua Carbon,
+     * nên vẫn lấy được data cũ dù theme đã XOÁ field ver_* khỏi schema (Carbon ngừng hydrate).
+     *
+     * Định dạng key complex của Carbon Fields (Key_Toolset): `_car_versions|<sub>|<hidx>|<group>|value`
+     * (5 đoạn, glue `|`). Ta gom theo <group> = chỉ số phiên bản, lấy các sub = ver_* + name.
+     * Trả list theo THỨ TỰ group: [ ['name'=>…, 'specs'=>[[label,value]…]], … ].
+     */
+    private static function read_ver_specs_raw($post_id) {
+        global $wpdb;
+        if (!$post_id || !isset($wpdb) || !is_object($wpdb)) return [];
+        $rows = $wpdb->get_results($wpdb->prepare(
+            "SELECT meta_key, meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key LIKE %s",
+            (int) $post_id, $wpdb->esc_like('_car_versions|') . '%'
+        ));
+        $groups = [];
+        foreach ((array) $rows as $r) {
+            $seg = explode('|', $r->meta_key);
+            if (count($seg) !== 5 || end($seg) !== 'value') continue; // chỉ field trực tiếp (bỏ specs lồng)
+            $sub = $seg[1];
+            if (strpos($sub, ':') !== false) continue;                // bỏ hierarchy lồng (vd specs:spec_label)
+            $groups[(int) $seg[3]][$sub] = (string) $r->meta_value;
+        }
+        if (!$groups) return [];
+        ksort($groups);
+        $out = [];
+        foreach ($groups as $vals) {
+            $specs = [];
+            foreach (self::VER_MAP as $label => $field) {
+                if (isset($vals[$field]) && $vals[$field] !== '') $specs[] = ['label' => $label, 'value' => $vals[$field]];
+            }
+            $out[] = ['name' => $vals['name'] ?? '', 'specs' => $specs];
+        }
+        return $out;
+    }
+
+    /** Đọc specs lồng (mới) của 1 phiên bản; trống → fallback ver_* Carbon (field còn khai báo). */
     private static function read_version_specs($v) {
         $out = [];
         foreach ((array) ($v['specs'] ?? []) as $s) {
@@ -55,13 +91,21 @@ class VCS_Repository {
     /** Dữ liệu hiện tại: ['price'=>int, 'versions'=>[[name,price,status,specs]], 'specs'=>[[label,value]]]. */
     public static function current($post_id) {
         $versions = [];
+        $raw = null; // đọc lười postmeta thô (fallback 3), chỉ khi cần
+        $i = 0;
         foreach ((array) self::cf($post_id, 'car_versions') as $v) {
+            $specs = self::read_version_specs($v);          // tầng 1+2: nested, rồi ver_* qua Carbon
+            if (!$specs) {                                  // tầng 3: postmeta thô (field đã bị xoá khỏi schema)
+                if ($raw === null) $raw = self::read_ver_specs_raw($post_id);
+                if (isset($raw[$i]['specs'])) $specs = $raw[$i]['specs'];
+            }
             $versions[] = [
                 'name'   => (string) ($v['name'] ?? ''),
                 'price'  => (int) preg_replace('/\D/', '', (string) ($v['price'] ?? '')),
                 'status' => (($v['status'] ?? 'on_sale') === 'discontinued') ? 'discontinued' : 'on_sale',
-                'specs'  => self::read_version_specs($v),
+                'specs'  => $specs,
             ];
+            $i++;
         }
         $specs = [];
         foreach ((array) self::cf($post_id, 'car_specs') as $s) {
